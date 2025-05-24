@@ -1,0 +1,49 @@
+[project]
+name = "kernel-trainer"
+version = "0.1.2"
+description = "A library enabling the training process for feature map training."
+authors = [
+    {name = "Iraitz", email = "iraitz@falcondale.pro"},
+]
+dependencies = [
+    "scikit-learn>=1.5.1",
+    "pennylane>=0.36.0",
+    "deap>=1.4.1",
+    "qiskit>=1.1.1",
+    "qiskit-machine-learning>=0.7.2",
+    "joblib>=1.4.2",
+    "loguru>=0.7.3",
+    "click>=8.1.8",
+    "qiskit-algorithms>=0.3.1",
+    "qulacs>=0.6.11",
+    "pennylane-qulacs>=0.40.0",
+    "tqdm>=4.67.1",
+    "rich>=14.0.0",
+]
+requires-python = ">=3.10"
+readme = "README.md"
+license = {text = " "}
+
+[build-system]
+requires = ["pdm-backend"]
+build-backend = "pdm.backend"
+
+[tool.pdm]
+distribution = true
+
+[project.scripts]
+ktrainer = "kernel_trainer.cli:cli"
+
+[dependency-groups]
+notebooks = [
+    "seaborn>=0.13.2",
+    "ucimlrepo>=0.0.7",
+    "ipykernel>=6.29.5",
+    "matplotlib>=3.9.0",
+    "pylatexenc>=2.10",
+    "ucimlrepo>=0.0.7",
+    "ipykernel>=6.29.5",
+    "matplotlib>=3.9.0",
+    "pylatexenc>=2.10",
+    "qiskit-aer>=0.16.0",
+]
