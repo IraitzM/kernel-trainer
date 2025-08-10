@@ -106,7 +106,7 @@ class DataGenerator:
                 return pd.concat([features, target], axis=1)
             case "1c":
                 n1 = int((self.samples * self.imbalance_ratio) / 2)
-                n2 = int((self.samples - n1) / 2)
+                n2 = int((self.samples - n1*2) / 2)
 
                 X0 = self._ellipsoid([0.3, 0.2, 0.8], 0.25, 0.15, 0.15, n1)
                 X1 = self._ellipsoid([0.7, 0.4, 0.6], 0.25, 0.15, 0.15, n2)
@@ -122,7 +122,7 @@ class DataGenerator:
                 return pd.concat([features, target], axis=1)
             case "2a":
                 n1 = int((self.samples * self.imbalance_ratio) / 2)
-                n2 = int((self.samples - n1) / 2)
+                n2 = int((self.samples - n1*2) / 2)
 
                 X0 = self._ellipsoid([0.3, 0.2, 0.8], 0.25, 0.15, 0.15, n1)
                 X1 = self._ellipsoid([0.7, 0.4, 0.6], 0.25, 0.15, 0.15, n2)
@@ -138,7 +138,7 @@ class DataGenerator:
                 return pd.concat([features, target], axis=1)
             case "2b":
                 n1 = int((self.samples * self.imbalance_ratio) / 5)
-                n2 = int((self.samples - n1) / 4)
+                n2 = int((self.samples - n1*5) / 4)
 
                 X0 = self._ellipsoid([0.2, 0.2, 0.8], 0.15, 0.15, 0.15, n1)
                 X1 = self._ellipsoid([0.5, 0.2, 0.5], 0.15, 0.15, 0.15, n2)
@@ -171,7 +171,7 @@ class DataGenerator:
                 return pd.concat([features, target], axis=1)
             case "2c":
                 n1 = int((self.samples * self.imbalance_ratio) / 8)
-                n2 = int((self.samples - n1) / 8)
+                n2 = int((self.samples - n1*8) / 8)
 
                 X0 = self._ellipsoid([0.15, 0.15, 0.85], 0.15, 0.15, 0.15, n1)
                 X1 = self._ellipsoid([0.38, 0.15, 0.62], 0.15, 0.15, 0.15, n2)
@@ -236,8 +236,8 @@ class DataGenerator:
                 target = pd.DataFrame(y_1, columns=["y"])
                 return pd.concat([features, target], axis=1)
             case "3a":
-                n1 = int((self.samples * self.imbalance_ratio) / 2)
-                n2 = int((self.samples - n1) / 2)
+                n1 = int(self.samples * self.imbalance_ratio)
+                n2 = int(self.samples - n1)
 
                 X1 = []
                 radius = 0.25

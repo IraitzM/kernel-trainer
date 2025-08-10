@@ -1,5 +1,6 @@
 """
-Expressivity and entanglement capacity.
+Metrics to be used for both evolutionary search and
+kernel evaluation (expresivity and entanglement capacity)
 """
 
 import numpy as np
@@ -11,9 +12,130 @@ from scipy.special import rel_entr  # kl_div
 from tqdm import trange
 
 from qiskit import QuantumCircuit
-from qiskit.quantum_info import DensityMatrix, partial_trace
+from qiskit.quantum_info import (
+    DensityMatrix,
+    partial_trace,
+    Statevector
+)
 from qiskit_aer import AerSimulator
 
+def qiskit_target_alignment(kernel: QuantumCircuit, X: np.array, y: np.array):
+    """
+    Target alignment loss function.
+    The definition of the function is taken from Equation (27,28) of [1].
+    The log-likelihood function is defined as:
+
+    .. math::
+
+        TA(K_{θ}) =
+        \\frac{\\sum_{i,j} K_{θ}(x_i, x_j) y_i y_j}
+        {\\sqrt{\\sum_{i,j} K_{θ}(x_i, x_j)^2 \\sum_{i,j} y_i^2 y_j^2}}
+
+    Refs:
+
+    [1]: T. Hubregtsen et al.,
+    "Training Quantum Embedding Kernels on Near-Term Quantum Computers",
+    `arXiv:2105.02276v1 (2021) <https://arxiv.org/abs/2105.02276>`_.
+
+    Args:
+        kernel (quantumcircuit): Qiskit quantum circuit
+        X (np.array): Samples
+        y (np.array): Target
+
+    Returns:
+        _type_: _description_
+    """
+
+    # Get estimated kernel matrix
+    kmatrix = kernel.evaluate(X)
+
+    # Rescale
+    nplus = np.count_nonzero(np.array(y) == 1)
+    nminus = len(y) - nplus
+    _Y = np.array([y / nplus if y == 1 else y / nminus for y in y])
+
+    # Target matrix
+    T = np.outer(_Y, _Y)
+    inner_product = np.sum(kmatrix * T)
+    norm = np.sqrt(np.sum(kmatrix * kmatrix) * np.sum(T * T))
+    alignment = inner_product / norm
+
+    return alignment
+
+def qiskit_centered_target_alignment(kernel: QuantumCircuit, X: np.array, y: np.array):
+    """
+    Compute Centered Kernel Alignment (CKA) between kernel matrix and target.
+
+    Refs:
+
+    [1]: Cortes et al.,
+    "Algorithms for Learning Kernels Based on Centered Alignment",
+    `https://arxiv.org/pdf/1203.0550`_.
+    
+    Args:
+        kmatrix: Kernel matrix K (n x n)
+        y: Target vector (n,)
+    
+    Returns:
+        float: CKA score
+    """
+    # Get estimated kernel matrix
+    kmatrix = kernel.evaluate(X)
+
+    n = len(y)
+    # Rescale
+    nplus = np.count_nonzero(np.array(y) == 1)
+    nminus = len(y) - nplus
+    _Y = np.array([y / nplus if y == 1 else y / nminus for y in y])
+
+    # Create centering matrix H = I - (1/n) * 1 * 1^T
+    H = np.eye(n) - (1/n) * np.ones((n, n))
+
+    # Center the kernel matrix: HKH
+    centered_kmatrix = H @ kmatrix @ H
+
+    # Target matrix (outer product of y)
+    T = np.outer(_Y, _Y)
+
+    # Center the target matrix: HTH  
+    centered_T = H @ T @ H
+
+    # Compute CKA using the Frobenius inner product
+    inner_product = np.sum(centered_kmatrix * centered_T)
+    norm_k = np.sqrt(np.sum(centered_kmatrix * centered_kmatrix))
+    norm_t = np.sqrt(np.sum(centered_T * centered_T))
+
+    # Handle edge case where norms are zero
+    if norm_k == 0 or norm_t == 0:
+        return 0.0
+
+    return inner_product / (norm_k * norm_t)
+
+def schmidt_decomp(qc: QuantumCircuit):
+    """
+    Schmidt decomposition
+    """
+
+    # Simulate the state
+    state = Statevector.from_instruction(qc)
+
+    # Convert statevector to a numpy array
+    state_array = state.data
+
+    # Reshape the state vector into a matrix for the SVD
+    matrix = state_array.reshape(qc.num_qubits, qc.num_qubits)  # Reshape for a 2x2 matrix
+
+    # Perform SVD
+    _, s, _ = np.linalg.svd(matrix)
+
+    # The Schmidt coefficients are the singular values (s)
+    schmidt_coefficients = s
+
+    # The Schmidt number is the number of non-zero singular values
+    # (accounting for numerical precision)
+    schmidt_number = np.sum(s > 1e-10)
+
+    return schmidt_number, schmidt_coefficients
 
 class Expressivity:
     """Expressivity measures as the capacity of a circuit
@@ -27,6 +149,7 @@ class Expressivity:
         Args:
             dims (int, optional): _description_. Defaults to 75.
         """
+        self.dims = dims
 
         # Possible Bin
         self.bins_list = []
@@ -38,29 +161,24 @@ class Expressivity:
         for i in range(dims - 1):
             self.bins_x.append(self.bins_list[1] + self.bins_list[i])
 
-        # Harr histogram
-        self.p_harr_hist = []
-        for i in range(dims - 1):
-            self.p_harr_hist.append(
-                self._p_harr(self.bins_list[i], self.bins_list[i + 1], 2)
-            )
+        # Haar histogram
+        self.p_haar_hist = []
 
         # Fidelity
         self.fidelity = []
         self.weights = []
 
-    def _p_harr(self, low: float, up: float, num: float) -> float:
-        """Harr-random states probability function.
+    def _set_p_haar(self, num: int):
+        """Set the Haar probability for a given circuit
 
         Args:
-            low (float): Lower bound
-            up (float): Upper bound
-            num (float): Number of samples
-
-        Returns:
-            float: Harr probability
+            num (int): _description_
         """
-        return (1 - low) ** (num - 1) - (1 - up) ** (num - 1)
+        self.p_haar_hist = []
+        for i in range(self.dims - 1):
+            self.p_haar_hist.append(
+                (1 - self.bins_list[i]) ** (2**num - 1) - (1 - self.bins_list[i + 1]) ** (2**num - 1)
+            )
 
     def plot(self):
         """Simple plot to check the overlap between the two
@@ -74,7 +192,7 @@ class Expressivity:
             label="Circuit",
             range=[0, 1],
         )
-        plt.plot(self.bins_x, self.p_harr_hist, label="Harr")
+        plt.plot(self.bins_x, self.p_haar_hist, label="Haar")
         plt.legend(loc="upper right")
         plt.show()
 
@@ -91,12 +209,14 @@ class Expressivity:
         Returns:
             float: _description_
         """
+        # Init Haar
+        nqubits = circuit.num_qubits
+        self._set_p_haar(nqubits)
 
         # Select the AerSimulator from the Aer provider
         simulator = AerSimulator(method="matrix_product_state")
 
         # Remove measurements
-        nqubits = circuit.num_clbits
         zero_state = "0" * nqubits
         circuit.remove_final_measurements(inplace=True)
 
@@ -141,7 +261,7 @@ class Expressivity:
             self.fidelity, bins=self.bins_list, weights=self.weights, range=[0, 1]
         )[0]
 
-        return sum(rel_entr(pi_hist, self.p_harr_hist))
+        return sum(rel_entr(pi_hist, self.p_haar_hist))
 
 
 class EntanglingCapacity:
@@ -158,12 +278,13 @@ class EntanglingCapacity:
         self.circuit = circuit
         self.N = circuit.num_qubits
 
-    def calculate(self, n_samples):
+    def calculate(self, nshots: int = 10_000, samples: int = 4_000):
         """
         Computes the Meyer-Wallach entanglement measure for the quantum circuit.
 
         Args:
-            n_samples (int): Number of samples to calculate the entanglement measure
+            nshots (int, optional): _description_. Defaults to 10_000.
+            samples (int, optional): _description_. Defaults to 4_000.
 
         Returns:
             float: Meyer-Wallach entanglement measure averaged over multiple samples.
@@ -171,15 +292,15 @@ class EntanglingCapacity:
         # Select the AerSimulator from the Aer provider
         simulator = AerSimulator(method="matrix_product_state")
 
-        res = np.zeros(n_samples, dtype=complex)
-        for i in trange(n_samples):
+        res = np.zeros(samples, dtype=complex)
+        for i in trange(samples):
             # Add random parameters
             params = {}
             for p in self.circuit.parameters:
                 params[p] = 2 * pi * random()
             qc = self.circuit.assign_parameters(params)
             qc.save_statevector(label="statevector")
-            job = simulator.run([qc], shots=10_000)
+            job = simulator.run([qc], shots=nshots)
             result = job.result()
             data = result.data()
 

@@ -33,7 +33,6 @@ generations = click.option(
     help="Number of generations.",
     default=2,
     type=click.INT,
-    prompt=True,
 )
 
 population = click.option(
@@ -42,7 +41,6 @@ population = click.option(
     help="Number of individuals.",
     default=2,
     type=click.INT,
-    prompt=True,
 )
 
 chain_size = click.option(
@@ -60,7 +58,6 @@ mutpb = click.option(
     help="Probability of mutation",
     default=0.05,
     type=click.FLOAT,
-    prompt=True,
 )
 
 cxpb = click.option(
@@ -69,7 +66,6 @@ cxpb = click.option(
     help="Probability of crossbreed",
     default=0.5,
     type=click.FLOAT,
-    prompt=True,
 )
 
 processes = click.option(
@@ -78,7 +74,6 @@ processes = click.option(
     help="Number of cores to run on.",
     default=2,
     type=click.INT,
-    prompt=True,
 )
 
 out_path = click.option(
@@ -86,7 +81,15 @@ out_path = click.option(
     envvar=None,
     help="Output folder/file",
     type=click.Path(resolve_path=True, path_type=Path),
-    default="results/train",
+    default=None, #"results/train",
+)
+
+out_path_man = click.option(
+    "--out-path",
+    envvar=None,
+    help="Output folder/file",
+    type=click.Path(resolve_path=True, path_type=Path),
+    prompt=True
 )
 
 dataset_id = click.option(
@@ -96,6 +99,22 @@ dataset_id = click.option(
     default="0",
     type=click.Choice(["0", "1a", "1b", "1c", "2a", "2b", "2c", "3a", "3b", "3c"]),
     prompt=True,
+)
+
+metric = click.option(
+    "--metric",
+    envvar=None,
+    help="Metric to be used",
+    default="CKA",
+    type=click.Choice(["KTA","CKA"]),
+)
+
+algo = click.option(
+    "--algorithm",
+    envvar=None,
+    help="Algorithm to be used",
+    default="evolutionary",
+    type=click.Choice(["brute-force","evolutionary"]),
 )
 
 samples = click.option(
@@ -122,4 +141,11 @@ seed = click.option(
     help="Seed",
     default=4321,
     type=click.INT,
+)
+
+cache = click.option(
+    "--cache",
+    is_flag=True,
+    help="To enable cache",
+    default=False,
 )

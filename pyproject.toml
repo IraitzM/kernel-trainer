@@ -1,6 +1,6 @@
 [project]
 name = "kernel-trainer"
-version = "0.1.2"
+version = "0.1.5"
 description = "A library enabling the training process for feature map training."
 authors = [
     {name = "Iraitz", email = "iraitz@falcondale.pro"},
@@ -19,8 +19,10 @@ dependencies = [
     "pennylane-qulacs>=0.40.0",
     "tqdm>=4.67.1",
     "rich>=14.0.0",
+    "qiskit-aer>=0.17.1",
+    "matplotlib>=3.10.5",
 ]
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 readme = "README.md"
 license = {text = " "}
 
@@ -39,11 +41,7 @@ notebooks = [
     "seaborn>=0.13.2",
     "ucimlrepo>=0.0.7",
     "ipykernel>=6.29.5",
-    "matplotlib>=3.9.0",
     "pylatexenc>=2.10",
-    "ucimlrepo>=0.0.7",
-    "ipykernel>=6.29.5",
-    "matplotlib>=3.9.0",
-    "pylatexenc>=2.10",
-    "qiskit-aer>=0.16.0",
+    "plotly>=6.1.2",
+    "nbformat>=5.10.4",
 ]

@@ -7,6 +7,7 @@ import pennylane as qml
 
 from qiskit import QuantumCircuit
 from qiskit.primitives import Sampler
+#from qiskit_aer.primitives import Sampler
 from qiskit.circuit import Parameter
 from qiskit.circuit.library import ZFeatureMap
 from qiskit_algorithms.state_fidelities import ComputeUncompute
@@ -14,12 +15,16 @@ from qiskit_machine_learning.kernels import (
     FidelityQuantumKernel,
     TrainableFidelityQuantumKernel,
 )
+from .metrics import (
+    qiskit_target_alignment,
+    qiskit_centered_target_alignment,
+    EntanglingCapacity,
+    Expressivity
+)
 
-import multiprocessing
+from loguru import logger
 from joblib import Parallel, delayed
-from deap import base, creator, tools, algorithms
-
-pool = multiprocessing.Pool()
+from deap import base, creator
 
 creator.create("FitnessMin", base.Fitness, weights=(1.0,))  # Minimization
 creator.create("Individual", np.ndarray, fitness=creator.FitnessMin, strategy=None)
@@ -50,10 +55,6 @@ def pennylane_pauli_kernel(
 
         projector = np.zeros((2**n_qubits, 2**n_qubits))
         projector[0, 0] = 1
-
-        # ComputeUncompute pattern
-        for i in range(n_qubits):
-            qml.Hadamard(wires=[i])
 
         # Compute
         for _ in range(reps):
@@ -95,56 +96,9 @@ def pennylane_pauli_kernel(
                         -2 * np.prod(np.pi - x2[indexes], axis=0), word, wires=indexes
                     )
 
-        for i in range(n_qubits):
-            qml.Hadamard(wires=[i])
-
         return qml.probs(wires=range(n_qubits))
 
     return inner_func
-
-
-def qiskit_target_alignment(kernel: QuantumCircuit, X: np.array, y: np.array):
-    """
-    Target alignment loss function.
-    The definition of the function is taken from Equation (27,28) of [1].
-    The log-likelihood function is defined as:
-
-    .. math::
-
-        TA(K_{θ}) =
-        \\frac{\\sum_{i,j} K_{θ}(x_i, x_j) y_i y_j}
-        {\\sqrt{\\sum_{i,j} K_{θ}(x_i, x_j)^2 \\sum_{i,j} y_i^2 y_j^2}}
-
-    Refs:
-
-    [1]: T. Hubregtsen et al.,
-    "Training Quantum Embedding Kernels on Near-Term Quantum Computers",
-    `arXiv:2105.02276v1 (2021) <https://arxiv.org/abs/2105.02276>`_.
-
-    Args:
-        kernel (quantumcircuit): Qiskit quantum circuit
-        X (np.array): Samples
-        y (np.array): Target
-
-    Returns:
-        _type_: _description_
-    """
-
-    # Get estimated kernel matrix
-    kmatrix = kernel.evaluate(X)
-
-    # Rescale
-    nplus = np.count_nonzero(np.array(y) == 1)
-    nminus = len(y) - nplus
-    _Y = np.array([y / nplus if y == 1 else y / nminus for y in y])
-
-    # Target matrix
-    T = np.outer(_Y, _Y)
-    inner_product = np.sum(kmatrix * T)
-    norm = np.sqrt(np.sum(kmatrix * kmatrix) * np.sum(T * T))
-    alignment = inner_product / norm
-
-    return alignment
 
 
 def qiskit_pauli_kernel(
@@ -176,7 +130,7 @@ def qiskit_pauli_kernel(
         for r_iter in range(reps):
             for word in paulis:
                 w = word.replace("I", "")
-                if len(w) == 1:
+                if len(word) == 1:
                     idx = word.index(w)
                     if w == "X":
                         feature_map.rx(theta=2 * (x[idx]), qubit=idx)
@@ -242,7 +196,7 @@ def qiskit_pauli_kernel(
                                 phi=trainable_params[(r_iter * dims + qi + i)], qubit=qi
                             )
 
-    # Aligned with pennylanes ordering
+    # Aligned with pennylane's ordering
     feature_map = feature_map.reverse_bits()
 
     sampler = Sampler()
@@ -338,7 +292,6 @@ def ind_to_qiskit_kernel(
     Returns:
         Quantum Kernel: Pennylane qnode to execute the quantum kernel function
     """
-
     replacements = {0: "I", 1: "X", 2: "Z", 3: "Y"}
     replacer = replacements.get  # For faster gets.
 
@@ -356,9 +309,35 @@ def ind_to_qiskit_kernel(
 
     return kernel
 
+def get_stats(individual, num_qubits):
+    """
+    Gets some key statistics for a feature map individual
+    """
+    qc = QuantumCircuit(num_qubits)
+
+    kernel_auto = ind_to_qiskit_kernel(individual, qc)
+    depth = kernel_auto.feature_map.depth()
+
+    qc = QuantumCircuit(num_qubits, num_qubits)
+    qc.compose(kernel_auto.feature_map, inplace=True)
+    qc.measure([x for x in range(num_qubits)],[x for x in range(num_qubits)])
+
+    expr = Expressivity(dims = 120)
+    expr_m = expr.calculate(qc, nshots=10_000, samples=4_000)
+
+    ent_cap = EntanglingCapacity(qc)
+    entang = ent_cap.calculate(samples=4_000)
+
+    return depth, expr_m, entang
 
 def evaluation_function(
-    individual, X: np.ndarray, y: np.ndarray, backend: str = "pennylane"
+    individual,
+    X: np.ndarray,
+    y: np.ndarray,
+    backend: str = "pennylane",
+    metric: str = 'KTA',
+    penalize_complexity: bool = False,
+    cache : dict = None
 ):
     """Creates the evaluator function
 
@@ -368,11 +347,34 @@ def evaluation_function(
         y (np.ndarray): _description_
         per_class (int, optional): _description_. Defaults to 10.
     """
+    # Fitness score, default 0
+    fit_score = 0
+
+    # No operation
+    if sum(individual) == 0:
+        return (fit_score,)
+
+    # Check cache
+    if cache:
+        ind_string = "".join([str(x) for x in individual])
+        logger.info(f"Looking for ind {ind_string}")
+        if ind_string in cache:
+            return cache[ind_string]
+
     if backend == "pennylane":
         device = qml.device("qulacs.simulator", wires=X.shape[1])  # lightning.gpu
         kernel = ind_to_pennylane_kernel(individual, device)
 
-        return (qml.kernels.target_alignment(X, y, lambda x1, x2: kernel(x1, x2)[0]),)
+        fit_score = qml.kernels.target_alignment(X, y, lambda x1, x2: kernel(x1, x2)[0])
+
+        if penalize_complexity:
+            specs = qml.specs(qnode=kernel)(X[0], X[0])
+            resources = specs["resources"]
+
+            depth = resources.depth
+            non_local_gates = resources.gate_types["PauliRot"]
+
+            fit_score = fit_score * non_local_gates * depth
 
     elif backend == "qiskit":
         qc = QuantumCircuit(X.shape[1])
@@ -380,97 +382,65 @@ def evaluation_function(
         # Do some hard computing on the individual
         kernel = ind_to_qiskit_kernel(individual, qc)
 
+        # Mask that fixes qiskit's idle qubit removal
+        qubit_alloc = np.array(individual).reshape(-1, X.shape[1]).sum(axis=0)
+        mask = (qubit_alloc > 0).tolist()
+
         try:
-            return (qiskit_target_alignment(kernel, X, y),)
-        except Exception:
+            if metric == 'KTA':
+                fit_score = qiskit_target_alignment(kernel, X[:, mask], y)
+            else:
+                fit_score = qiskit_centered_target_alignment(kernel, X[:, mask], y)
+
+            if penalize_complexity:
+                non_local_gates = kernel.feature_map.num_nonlocal_gates()
+                depth = kernel.feature_map.depth()
+
+                fit_score = fit_score * non_local_gates * depth
+
+        except Exception as e:
             # Some individuals raise issues when building the target alignment
-            return (0,)
+            logger.error(f"{individual}: {e}")
 
+    # Cache
+    if cache:
+        cache[ind_string] = (fit_score,)
 
-def kernel_generator(
-    X,
-    y,
-    backend: str = "qiskit",
-    population: int = 1000,
-    chain_size: int = 10,
-    ngen: int = 50,
-    cxpb: float = 0.2,
-    mutpb: float = 0.1,
-    logger=None,
-):
-    """
-    Iterated over a population of potential kernels checking
-    their fitness so that best individuals are obtained.
+    return (fit_score,)
 
-    Args:
-        X (_type_): Sample data
-        y (_type_): Target label
-        population (int, optional): _description_. Defaults to 1000.
-        chain_size (int, optional): _description_. Defaults to 10.
-        ngen (int, optional): _description_. Defaults to 50.
-        cxpb (float, optional): _description_. Defaults to 0.2.
-        mutpb (float, optional): _description_. Defaults to 0.1.
+def get_matrices(X_train, X_test, y_train, fm: str = 'Z'):
 
-    Returns:
-        _type_: _description_
-    """
-    toolbox = base.Toolbox()
-    toolbox.register(
-        "individual", initES, creator.Individual, creator.Strategy, chain_size
-    )
-    toolbox.register("population", tools.initRepeat, list, toolbox.individual)
-    toolbox.register("mate", tools.cxTwoPoint)
-    toolbox.register("mutate", mutate)
-    toolbox.register("select", tools.selTournament, tournsize=3)
+    num_dim = X_train.shape[1]
 
-    # Distributed
-    toolbox.register("map", pool.map)
-    toolbox.register("evaluate", evaluation_function, X=X, y=y, backend=backend)
+    if fm == 'Z':
+        kernel = qiskit_pauli_kernel(dims=num_dim, paulis=None)
+    elif fm == 'ZZ':
+        from qiskit.circuit.library import ZZFeatureMap
 
-    population = toolbox.population(n=population)
-    stats = tools.Statistics(lambda ind: ind.fitness.values)
-    stats.register("avg", np.mean)
-    stats.register("std", np.std)
-    stats.register("min", np.min)
-    stats.register("max", np.max)
+        sampler = Sampler()
+        fidelity = ComputeUncompute(sampler=sampler)
 
-    # Algorithm
-    logbook = tools.Logbook()
-    logbook.header = ["gen", "nevals"] + (stats.fields if stats else [])
+        # Instantiate quantum kernel
+        feature_map = ZZFeatureMap(num_dim, reps=1)
+        kernel = FidelityQuantumKernel(fidelity=fidelity, feature_map=feature_map)
 
-    # Evaluate the individuals with an invalid fitness
-    invalid_ind = [ind for ind in population if not ind.fitness.valid]
-    fitnesses = toolbox.map(toolbox.evaluate, invalid_ind)
-    for ind, fit in zip(invalid_ind, fitnesses):
-        ind.fitness.values = fit
+    cka = qiskit_centered_target_alignment(kernel, X_train, y_train)
 
-    record = stats.compile(population) if stats else {}
-    logbook.record(gen=0, nevals=len(invalid_ind), **record)
-    logger.info(logbook.stream)
+    matrix_train = kernel.evaluate(x_vec=X_train)
+    matrix_test = kernel.evaluate(x_vec=X_test, y_vec=X_train)
 
-    # Begin the generational process
-    for gen in range(1, ngen + 1):
-        # Select the next generation individuals
-        offspring = toolbox.select(population, len(population))
+    return matrix_train, matrix_test, cka
 
-        # Vary the pool of individuals
-        offspring = algorithms.varAnd(offspring, toolbox, cxpb, mutpb)
+def get_matrices_ind(X_train, X_test, y_train, ind: list):
 
-        # Evaluate the individuals with an invalid fitness
-        invalid_ind = [ind for ind in offspring if not ind.fitness.valid]
-        fitnesses = toolbox.map(toolbox.evaluate, invalid_ind)
-        for ind, fit in zip(invalid_ind, fitnesses):
-            ind.fitness.values = fit
+    num_dim = X_train.shape[1]
+    qc = QuantumCircuit(num_dim)
 
-        # Replace the current population by the offspring
-        population[:] = offspring
+    kernel = ind_to_qiskit_kernel(individual=ind, qc=qc)
 
-        # Append the current generation statistics to the logbook
-        record = stats.compile(population) if stats else {}
-        logbook.record(gen=gen, nevals=len(invalid_ind), **record)
-        logger.info(logbook.stream)
+    cka = qiskit_centered_target_alignment(kernel, X_train, y_train)
 
-    # Order
-    population.sort(key=lambda e: e.fitness, reverse=True)
+    matrix_train = kernel.evaluate(x_vec=X_train)
+    matrix_test = kernel.evaluate(x_vec=X_test, y_vec=X_train)
 
-    return population, logbook
+    return matrix_train, matrix_test, cka
