@@ -3,7 +3,7 @@ name = "kernel-trainer"
 version = "0.1.5"
 description = "A library enabling the training process for feature map training."
 authors = [
-    {name = "Iraitz", email = "iraitz@falcondale.pro"},
+    {name = "Iraitz", email = "iraitzm@gmail.com"},
 ]
 dependencies = [
     "scikit-learn>=1.5.1",

@@ -248,7 +248,6 @@ def benchmark(**kwargs):
 
     # Look for data
     dataset = pd.read_csv(file_path)
-    logger.info(dataset)
     dataset_id = file_path.name[:2]
     logger.info(f"Dataset {dataset_id}")
 

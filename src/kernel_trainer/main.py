@@ -73,7 +73,7 @@ def kernel_generator(
     mutpb: float = 0.1,
     processes: int = 1,
     penalize_complexity: bool = False,
-    tournament_size : int = 3,
+    tournament_size : int = 10,
     cache: dict = None
 ):
     """
