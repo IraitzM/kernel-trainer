@@ -7,4 +7,10 @@ tasks:
     vars:
       DATASET_ID: "{{index .MATCH 0}}"
     cmds:
-      - pdm run ktrainer search --file-path ./data/{{.DATASET_ID}}_3d_200s_0.5ir_4321_2025-08-10.csv --dims 3 --mode raw --algorithm evolutionary --metric CKA --generations 25 --population 100 --chain-size 12 --mutpb 0.05 --cxpb 0.5 --processes 12 --cache --out-path ./results/{{.DATASET_ID}}
+      - pdm run ktrainer search --file-path ./data/{{.DATASET_ID}}_3d_10000s_0.5ir_4321_2025-08-30.csv --dims 3 --mode raw --algorithm evolutionary --metric CKA --generations 25 --population 100 --chain-size 12 --mutpb 0.05 --cxpb 0.5 --processes 12 --cache --out-path ./results/{{.DATASET_ID}}
+
+  generate:*:
+    vars:
+      DATASET_ID: "{{index .MATCH 0}}"
+    cmds:
+      - pdm run ktrainer generate --out-path data --dataset-id {{.DATASET_ID}} --imb-ratio 0.5 --samples 10000

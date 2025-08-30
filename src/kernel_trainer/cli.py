@@ -16,6 +16,7 @@ from kernel_trainer.main import (
     brute_force, kernel_generator
 )
 from kernel_trainer.kernels import (
+    expsine2_kernel, sin_kernel,
     get_stats, get_matrices, get_matrices_ind
 )
 from kernel_trainer.preprocess import Preprocessor
@@ -287,8 +288,13 @@ def benchmark(**kwargs):
     table.add_column("CKA", style="green")
 
     # Classical
-    for svc_type in ["linear","poly","rbf"]:
-        model = SVC(kernel=svc_type, probability=True, random_state=42)
+    for svc_type in ["linear","poly","rbf","sin", "expsine"]:
+        if svc_type == "expsine":
+            model = SVC(kernel=expsine2_kernel, probability=True, random_state=42)
+        elif svc_type == "sin":
+            model = SVC(kernel=sin_kernel, probability=True, random_state=42)
+        else:
+            model = SVC(kernel=svc_type, probability=True, random_state=42)
         model.fit(X_train, y_train)
 
         y_pred = model.predict_proba(X_test)[:, 1]

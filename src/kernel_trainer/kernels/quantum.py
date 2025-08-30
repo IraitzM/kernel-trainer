@@ -15,7 +15,7 @@ from qiskit_machine_learning.kernels import (
     FidelityQuantumKernel,
     TrainableFidelityQuantumKernel,
 )
-from .metrics import (
+from kernel_trainer.metrics import (
     qiskit_target_alignment,
     qiskit_centered_target_alignment,
     EntanglingCapacity,
@@ -47,7 +47,9 @@ def pennylane_pauli_kernel(
     Returns:
         function: Function to be used as a quantum circuit evaluation
     """
+    hadamard = False
     if not paulis:
+        hadamard = True
         paulis = ["Z"]
 
     def inner_func(x1, x2):
@@ -61,6 +63,8 @@ def pennylane_pauli_kernel(
             for w in paulis:
                 if len(w) == 1:
                     for i in range(n_qubits):
+                        if hadamard:
+                            qml.Hadamard(i)
                         qml.PauliRot(2 * x1[i], w, wires=i)
                 elif len(w) == 2 and entanglement == "linear":
                     for i in range(n_qubits - 1):
@@ -82,6 +86,8 @@ def pennylane_pauli_kernel(
                 if len(w) == 1:
                     for i in reversed(range(n_qubits)):
                         qml.PauliRot(-(2 * x2[i]), w, wires=i)
+                        if hadamard:
+                            qml.Hadamard(i)
                 elif len(w) == 2 and entanglement == "linear":
                     for i in range(n_qubits - 1):
                         qml.PauliRot(
