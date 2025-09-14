@@ -3,7 +3,7 @@
 version: '3'
 
 tasks:
-  train:*:
+  search:*:
     vars:
       DATASET_ID: "{{index .MATCH 0}}"
     cmds:

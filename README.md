@@ -17,12 +17,12 @@ ktrainer generate
     --imbalance-ratio 0.1
 ```
 
-Once the file is created, training can be triggered as follows:
+Once the file is created, search of the best kernel can be triggered as follows:
 ```py
-ktrainer train 
+ktrainer search 
     --file-path file.csv
     --dims 3
-    --mode pca
+    --mode raw
     --generations 100
     --population 1000
     --chain-size 20
@@ -31,3 +31,31 @@ ktrainer train
     --processes 15 
     --out-path out
 ```
+> [!TIP]
+> [Taskfile](https://taskfile.dev/) exists with default parameters so you can simply call:
+>
+> $> task generate:1a
+>
+> $> task search:1a
+
+Two other functionalities have been added to benchmark and compare results.
+
+```py
+ktrainer stats 
+    --file-path file.csv
+```
+
+That takes the files that were obtained in the results folder and looks into the statistics for expressivity, entanglement capacity and CKA for each dataset id.
+
+![](assets/stats.png)
+
+The benchmark subcommand, takes an individual dataset id from its original dataset file and compares the obtained best individual against classical and pre-fixed quantum kernels.
+```py
+ktrainer benchmark 
+    --file-path file.csv
+    --dims 3
+    --mode raw
+```
+A stats summary table will appear at the end for a particular dataset and best found individual labeled as `best`.
+
+![](assets/benchmarkcli.png)
