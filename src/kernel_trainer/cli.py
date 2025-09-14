@@ -12,12 +12,13 @@ from rich.console import Console
 from rich.table import Table
 
 import kernel_trainer.params as p
-from kernel_trainer.main import (
-    brute_force, kernel_generator
-)
+from kernel_trainer.main import brute_force, kernel_generator
 from kernel_trainer.kernels import (
-    expsine2_kernel, sin_kernel,
-    get_stats, get_matrices, get_matrices_ind
+    expsine2_kernel,
+    sin_kernel,
+    get_stats,
+    get_matrices,
+    get_matrices_ind,
 )
 from kernel_trainer.preprocess import Preprocessor
 from kernel_trainer.dataset import DataGenerator
@@ -94,7 +95,7 @@ def train(**kwargs):
     logger.info(f"Training with {X_train.shape} dataset.")
 
     # Select algo
-    if algo == 'brute-force':
+    if algo == "brute-force":
         logger.info(f"Going for the brute force approach for {4**chain_size} items")
         config = {
             "X": X_train[:, :num_dimensions],
@@ -102,7 +103,7 @@ def train(**kwargs):
             "chain_size": chain_size,
             "processes": kwargs.get("processes"),
             "backend": kwargs.get("backend", "qiskit"),
-            "metric" : kwargs.get("metric", "CKA")
+            "metric": kwargs.get("metric", "CKA"),
         }
         pop_final, log = brute_force(**config)
     else:
@@ -117,7 +118,7 @@ def train(**kwargs):
             "cxpb": kwargs.get("cxpb"),
             "processes": kwargs.get("processes"),
             "backend": kwargs.get("backend", "qiskit"),
-            "metric" : kwargs.get("metric", "CKA")
+            "metric": kwargs.get("metric", "CKA"),
         }
         if "cache" in kwargs:
             config["cache"] = {}
@@ -168,8 +169,10 @@ def generate(**kwargs):
         # Day precision
         timestamp = datetime.datetime.now().strftime("%Y-%m-%d")
         data.to_csv(
-            f"{outpath}/{dataset_id}_{num_dimensions}d_{samples}s_{imbalance_ratio}ir_{seed}_{timestamp}.csv", index = False
+            f"{outpath}/{dataset_id}_{num_dimensions}d_{samples}s_{imbalance_ratio}ir_{seed}_{timestamp}.csv",
+            index=False,
         )
+
 
 @cli.command("stats")
 @p.file_path
@@ -179,15 +182,15 @@ def stats(**kwargs):
 
     # Data files
     data = {
-        "1a" : [],
-        "1b" : [],
-        "1c" : [],
-        "2a" : [],
-        "2b" : [],
-        "2c" : [],
-        "3a" : [],
-        "3b" : [],
-        "3c" : []
+        "1a": [],
+        "1b": [],
+        "1c": [],
+        "2a": [],
+        "2b": [],
+        "2c": [],
+        "3a": [],
+        "3b": [],
+        "3c": [],
     }
 
     # Directory
@@ -195,9 +198,9 @@ def stats(**kwargs):
         # List all files
         for x in os.listdir(file_path):
             if x.endswith(".pkl"):
-                dataset = x[:2] # First chars
+                dataset = x[:2]  # First chars
                 full_path = os.path.join(file_path, x)
-                with open(full_path, 'rb') as file:
+                with open(full_path, "rb") as file:
                     tmp = pickle.load(file)
 
                 data[dataset].append(tmp)
@@ -215,29 +218,35 @@ def stats(**kwargs):
     # Compute calculations
     keys = list(data.keys())
 
-    for k in tqdm.tqdm(keys, desc = "Iterating over keys"):
+    for k in tqdm.tqdm(keys, desc="Iterating over keys"):
         num_exp = len(data[k])
         max_cka = 0.0
         max_id = 0
         individual = None
         nqubits = 0
         for idx, exp in enumerate(data[k]):
-            if exp['log'][-1]["max"] > max_cka:
-                max_cka = exp['log'][-1]["max"]
+            if exp["log"][-1]["max"] > max_cka:
+                max_cka = exp["log"][-1]["max"]
                 max_id = idx
-                individual = exp['population'][0]
-                nqubits = exp['kwargs']['dims']
+                individual = exp["population"][0]
+                nqubits = exp["kwargs"]["dims"]
 
         # Best run
         depth, expr, entang = get_stats(individual, nqubits)
 
         table.add_row(
-            str(k), str(num_exp), str(max_cka), str(max_id), 
-            str(depth), str(expr), str(entang)
+            str(k),
+            str(num_exp),
+            str(max_cka),
+            str(max_id),
+            str(depth),
+            str(expr),
+            str(entang),
         )
 
     console = Console()
     console.print(table)
+
 
 @cli.command("benchmark")
 @p.file_path
@@ -269,15 +278,15 @@ def benchmark(**kwargs):
     # Find best result
     max_cka = 0.0
     individual = None
-    for x in os.listdir('./results/'):
+    for x in os.listdir("./results/"):
         if x.endswith(".pkl") and x.startswith(dataset_id):
-            full_path = os.path.join('./results/', x)
-            with open(full_path, 'rb') as file:
+            full_path = os.path.join("./results/", x)
+            with open(full_path, "rb") as file:
                 experiment = pickle.load(file)
 
-            if experiment['log'][-1]["max"] > max_cka:
-                max_cka = experiment['log'][-1]["max"]
-                individual = experiment['population'][0]
+            if experiment["log"][-1]["max"] > max_cka:
+                max_cka = experiment["log"][-1]["max"]
+                individual = experiment["population"][0]
     logger.info(f"Max CKA registered {max_cka}")
 
     # Summary table
@@ -288,7 +297,7 @@ def benchmark(**kwargs):
     table.add_column("CKA", style="green")
 
     # Classical
-    for svc_type in ["linear","poly","rbf","sin", "expsine"]:
+    for svc_type in ["linear", "poly", "rbf", "sin", "expsine"]:
         if svc_type == "expsine":
             model = SVC(kernel=expsine2_kernel, probability=True, random_state=42)
         elif svc_type == "sin":
@@ -299,7 +308,7 @@ def benchmark(**kwargs):
 
         y_pred = model.predict_proba(X_test)[:, 1]
         roc_auc = roc_auc_score(y_true=y_test, y_score=y_pred)
-        f1score = f1_score(y_test, model.predict(X_test) )
+        f1score = f1_score(y_test, model.predict(X_test))
 
         table.add_row(svc_type, str(roc_auc), str(f1score), "--")
 
@@ -312,7 +321,7 @@ def benchmark(**kwargs):
 
         y_pred = model.predict_proba(m_test)[:, 1]
         roc_auc = roc_auc_score(y_true=y_test, y_score=y_pred)
-        f1score = f1_score(y_test, model.predict(m_test) )
+        f1score = f1_score(y_test, model.predict(m_test))
 
         table.add_row(qsvc, str(roc_auc), str(f1score), str(cka))
 
@@ -324,12 +333,13 @@ def benchmark(**kwargs):
 
     y_pred = model.predict_proba(m_test)[:, 1]
     roc_auc = roc_auc_score(y_true=y_test, y_score=y_pred)
-    f1score = f1_score(y_test, model.predict(m_test) )
+    f1score = f1_score(y_test, model.predict(m_test))
 
     table.add_row("best", str(roc_auc), str(f1score), str(cka))
 
     console = Console()
     console.print(table)
+
 
 # Support running as a module
 if __name__ == "__main__":

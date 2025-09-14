@@ -45,6 +45,7 @@ def initES(icls, scls, size):
     ind.strategy = scls(random.choice(range(4)) for _ in range(size))
     return ind
 
+
 def mutate(individual):
     # Do some hard computing on the individual
     idx = random.choice(range(len(individual)))
@@ -65,7 +66,7 @@ def kernel_generator(
     X,
     y,
     backend: str = "qiskit",
-    metric: str = 'KTA',
+    metric: str = "KTA",
     num_pop: int = 1000,
     chain_size: int = 10,
     ngen: int = 50,
@@ -73,8 +74,8 @@ def kernel_generator(
     mutpb: float = 0.1,
     processes: int = 1,
     penalize_complexity: bool = False,
-    tournament_size : int = 10,
-    cache: dict = None
+    tournament_size: int = 10,
+    cache: dict = None,
 ):
     """
     Iterated over a population of potential kernels checking
@@ -176,20 +177,22 @@ def kernel_generator(
 
     return population, logbook
 
-def create_all(size : int):
+
+def create_all(size: int):
     """
     Create all combiantions
     """
     return_list = list(product(range(4), repeat=size))
-    return_list.remove((0,)*size)
+    return_list.remove((0,) * size)
 
     return return_list
+
 
 def brute_force(
     X,
     y,
     backend: str = "qiskit",
-    metric: str = 'KTA',
+    metric: str = "KTA",
     chain_size: int = 10,
     processes: int = 1,
     penalize_complexity: bool = False,
@@ -232,7 +235,6 @@ def brute_force(
         pauli_string = [str(code) for code in ind]
         output["".join(pauli_string)] = fit[0]
 
-
     # Statistics to show
     stats = tools.Statistics(lambda ind: ind)
     stats.register("avg", np.mean)
@@ -241,7 +243,7 @@ def brute_force(
     stats.register("max", np.max)
 
     logbook = tools.Logbook()
-    logbook.header = (stats.fields if stats else [])
+    logbook.header = stats.fields if stats else []
     record = stats.compile(output.values()) if stats else {}
     logbook.record(**record)
     # stats

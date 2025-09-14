@@ -81,7 +81,7 @@ out_path = click.option(
     envvar=None,
     help="Output folder/file",
     type=click.Path(resolve_path=True, path_type=Path),
-    default=None, #"results/train",
+    default=None,  # "results/train",
 )
 
 out_path_man = click.option(
@@ -89,7 +89,7 @@ out_path_man = click.option(
     envvar=None,
     help="Output folder/file",
     type=click.Path(resolve_path=True, path_type=Path),
-    prompt=True
+    prompt=True,
 )
 
 dataset_id = click.option(
@@ -106,7 +106,7 @@ metric = click.option(
     envvar=None,
     help="Metric to be used",
     default="CKA",
-    type=click.Choice(["KTA","CKA"]),
+    type=click.Choice(["KTA", "CKA"]),
 )
 
 algo = click.option(
@@ -114,7 +114,7 @@ algo = click.option(
     envvar=None,
     help="Algorithm to be used",
     default="evolutionary",
-    type=click.Choice(["brute-force","evolutionary"]),
+    type=click.Choice(["brute-force", "evolutionary"]),
 )
 
 samples = click.option(

@@ -7,6 +7,7 @@ from sklearn.svm import SVC
 from sklearn.gaussian_process.kernels import ExpSineSquared
 from sklearn.metrics import accuracy_score, roc_auc_score
 
+
 # Sin kernel
 def sin_kernel(X, Y):
     """
@@ -25,6 +26,7 @@ def sin_kernel(X, Y):
     # Apply sine transformation
     return amplitude * np.sin(frequency * dists)
 
+
 # ExpSineSquared
 def expsine2_kernel(X, Y):
     """
@@ -36,6 +38,7 @@ def expsine2_kernel(X, Y):
     """
     kernel = ExpSineSquared(length_scale=0.25, periodicity=0.1)
     return kernel(X, Y)
+
 
 class QuantumInspiredKernels:
     """
@@ -91,15 +94,19 @@ class QuantumInspiredKernels:
             phase_shifts = np.zeros(X.shape[1])
 
         # Transform features to trigonometric space
-        X_trig = np.hstack([
-            np.cos(freq_scale * X + phase_shifts),
-            np.sin(freq_scale * X + phase_shifts)
-        ])
+        X_trig = np.hstack(
+            [
+                np.cos(freq_scale * X + phase_shifts),
+                np.sin(freq_scale * X + phase_shifts),
+            ]
+        )
 
-        Y_trig = np.hstack([
-            np.cos(freq_scale * Y + phase_shifts),
-            np.sin(freq_scale * Y + phase_shifts)
-        ])
+        Y_trig = np.hstack(
+            [
+                np.cos(freq_scale * Y + phase_shifts),
+                np.sin(freq_scale * Y + phase_shifts),
+            ]
+        )
 
         # Standard inner product in transformed space
         return np.dot(X_trig, Y_trig.T)
@@ -114,10 +121,18 @@ class QuantumInspiredKernels:
             Y = X
 
         # Map features to spherical coordinates
-        theta_X = theta_scale * np.arctan2(X[:, 1], X[:, 0]) if X.shape[1] >= 2 else theta_scale * X[:, 0]
+        theta_X = (
+            theta_scale * np.arctan2(X[:, 1], X[:, 0])
+            if X.shape[1] >= 2
+            else theta_scale * X[:, 0]
+        )
         phi_X = phi_scale * np.sum(X, axis=1) if X.shape[1] > 1 else phi_scale * X[:, 0]
 
-        theta_Y = theta_scale * np.arctan2(Y[:, 1], Y[:, 0]) if Y.shape[1] >= 2 else theta_scale * Y[:, 0]
+        theta_Y = (
+            theta_scale * np.arctan2(Y[:, 1], Y[:, 0])
+            if Y.shape[1] >= 2
+            else theta_scale * Y[:, 0]
+        )
         phi_Y = phi_scale * np.sum(Y, axis=1) if Y.shape[1] > 1 else phi_scale * Y[:, 0]
 
         # Compute kernel as product of cosines of angle differences
@@ -147,7 +162,9 @@ class QuantumInspiredKernels:
             sin_Y = np.sin(scale * freq * Y)
 
             # Add contribution from this frequency
-            kernel_matrix += (np.dot(cos_X, cos_Y.T) + np.dot(sin_X, sin_Y.T)) / n_frequencies
+            kernel_matrix += (
+                np.dot(cos_X, cos_Y.T) + np.dot(sin_X, sin_Y.T)
+            ) / n_frequencies
 
         return kernel_matrix
 
@@ -173,22 +190,21 @@ class QuantumInspiredKernels:
         phases_Y = pauli_scale * np.sum(Y, axis=1)
 
         # Combine all Pauli-like operations
-        kernel = (np.dot(X, Y.T) +
-                 np.dot(X_flip, Y_flip.T) +
-                 np.dot(X_rot, Y_rot.T))
+        kernel = np.dot(X, Y.T) + np.dot(X_flip, Y_flip.T) + np.dot(X_rot, Y_rot.T)
 
         # Add phase-like contribution
         phase_contribution = np.cos(phases_X[:, np.newaxis] - phases_Y[np.newaxis, :])
 
         return kernel + phase_contribution
 
+
 class HadamardRZKernels:
     """
     Quantum-inspired kernels combining Hadamard and RZ gate operations
-    
+
     Hadamard: H = (1/√2) * [[1, 1], [1, -1]] - creates superposition
     RZ(φ): [[e^(-iφ/2), 0], [0, e^(iφ/2)]] - adds phase rotation
-    
+
     Combined operation: RZ(φ) * H creates superposition then phase rotation
     """
 
@@ -196,7 +212,7 @@ class HadamardRZKernels:
     def hadamard_rz_kernel(X, Y=None, rotation_scale=1.0, superposition_weight=0.5):
         """
         Direct Hadamard+RZ inspired kernel
-        
+
         Hadamard creates superposition: (x + x_orthogonal) / √2
         RZ adds phase: exp(i * rotation_scale * features)
         """
@@ -205,8 +221,12 @@ class HadamardRZKernels:
 
         # Hadamard-like transformation: create superposition states
         # For each point, create orthogonal component
-        X_hadamard = HadamardRZKernels._apply_hadamard_transform(X, superposition_weight)
-        Y_hadamard = HadamardRZKernels._apply_hadamard_transform(Y, superposition_weight)
+        X_hadamard = HadamardRZKernels._apply_hadamard_transform(
+            X, superposition_weight
+        )
+        Y_hadamard = HadamardRZKernels._apply_hadamard_transform(
+            Y, superposition_weight
+        )
 
         # RZ-like phase rotation on transformed features
         dot_products = np.dot(X_hadamard, Y_hadamard.T)
@@ -224,9 +244,12 @@ class HadamardRZKernels:
         # Create orthogonal/complementary features (Hadamard mixing)
         if X.shape[1] >= 2:
             # For 2D+, create rotated version
-            orthogonal = np.column_stack([
-                -X[:, 1], X[:, 0]  # 90-degree rotation
-            ])
+            orthogonal = np.column_stack(
+                [
+                    -X[:, 1],
+                    X[:, 0],  # 90-degree rotation
+                ]
+            )
             if X.shape[1] > 2:
                 # Add remaining dimensions with sign flip
                 orthogonal = np.hstack([orthogonal, -X[:, 2:]])
@@ -235,13 +258,15 @@ class HadamardRZKernels:
             orthogonal = -X
 
         # Hadamard superposition: (|0⟩ + |1⟩)/√2 analog
-        return (original + superposition_weight * orthogonal) / np.sqrt(1 + superposition_weight**2)
+        return (original + superposition_weight * orthogonal) / np.sqrt(
+            1 + superposition_weight**2
+        )
 
     @staticmethod
     def sequential_hadamard_rz_kernel(X, Y=None, rotation_scales=None, n_layers=3):
         """
         Sequential application of Hadamard+RZ layers (like quantum circuit)
-        
+
         Each layer: H → RZ(φ_i) → measurement contribution
         Final kernel is sum of all layer contributions
         """
@@ -275,10 +300,12 @@ class HadamardRZKernels:
         return total_kernel
 
     @staticmethod
-    def interferometric_hadamard_rz_kernel(X, Y=None, rotation_scale=1.0, interference_param=0.5):
+    def interferometric_hadamard_rz_kernel(
+        X, Y=None, rotation_scale=1.0, interference_param=0.5
+    ):
         """
         Interferometric kernel: Hadamard creates interference patterns, RZ modulates phases
-        
+
         Simulates quantum interference by combining multiple paths
         """
         if Y is None:
@@ -294,7 +321,9 @@ class HadamardRZKernels:
 
         # Apply different RZ rotations to each path
         phases1 = rotation_scale * np.dot(X_path1, Y_path1.T)
-        phases2 = rotation_scale * np.dot(X_path2, Y_path2.T) + np.pi * interference_param
+        phases2 = (
+            rotation_scale * np.dot(X_path2, Y_path2.T) + np.pi * interference_param
+        )
 
         # Quantum interference: add amplitudes then take magnitude squared
         amplitude1 = np.exp(1j * phases1)
@@ -308,7 +337,7 @@ class HadamardRZKernels:
     def parameterized_hadamard_rz_kernel(X, Y=None, theta_params=None, phi_params=None):
         """
         Parameterized quantum circuit inspired kernel
-        
+
         Uses parameterized rotations: RY(θ) H RZ(φ)
         More flexible than fixed Hadamard+RZ
         """
@@ -328,8 +357,12 @@ class HadamardRZKernels:
 
         for i in range(n_features):
             # RY rotation (parameterized Hadamard-like)
-            X_ry = X[:, i] * np.cos(theta_params[i]) + np.ones_like(X[:, i]) * np.sin(theta_params[i])
-            Y_ry = Y[:, i] * np.cos(theta_params[i]) + np.ones_like(Y[:, i]) * np.sin(theta_params[i])
+            X_ry = X[:, i] * np.cos(theta_params[i]) + np.ones_like(X[:, i]) * np.sin(
+                theta_params[i]
+            )
+            Y_ry = Y[:, i] * np.cos(theta_params[i]) + np.ones_like(Y[:, i]) * np.sin(
+                theta_params[i]
+            )
 
             # Hadamard mixing
             X_h = (X_ry + X[:, i]) / np.sqrt(2)
@@ -344,10 +377,12 @@ class HadamardRZKernels:
         return np.real(np.exp(1j * phases))
 
     @staticmethod
-    def quantum_fourier_hadamard_kernel(X, Y=None, n_qubits=None, rotation_strength=1.0):
+    def quantum_fourier_hadamard_kernel(
+        X, Y=None, n_qubits=None, rotation_strength=1.0
+    ):
         """
         Quantum Fourier Transform + Hadamard inspired kernel
-        
+
         Combines QFT-like multi-frequency analysis with Hadamard superposition
         """
         if Y is None:
@@ -374,15 +409,19 @@ class HadamardRZKernels:
                 sin_Y = np.sin(rotation_strength * freq * Y_super[:, dim])
 
                 # Add contribution from this frequency and dimension
-                kernel_matrix += (np.outer(cos_X, cos_Y) + np.outer(sin_X, sin_Y)) / (n_qubits * X.shape[1])
+                kernel_matrix += (np.outer(cos_X, cos_Y) + np.outer(sin_X, sin_Y)) / (
+                    n_qubits * X.shape[1]
+                )
 
         return kernel_matrix
 
     @staticmethod
-    def entangled_hadamard_rz_kernel(X, Y=None, entanglement_strength=0.5, rotation_scale=1.0):
+    def entangled_hadamard_rz_kernel(
+        X, Y=None, entanglement_strength=0.5, rotation_scale=1.0
+    ):
         """
         Simulates entangled qubits with Hadamard + RZ
-        
+
         Creates correlations between features (entanglement-like)
         """
         if Y is None:
@@ -396,8 +435,12 @@ class HadamardRZKernels:
         for i in range(n_features):
             for j in range(i, n_features):
                 # Apply Hadamard to feature pair
-                X_pair = np.column_stack([X[:, i], X[:, j] if j < n_features else X[:, i]])
-                Y_pair = np.column_stack([Y[:, i], Y[:, j] if j < n_features else Y[:, i]])
+                X_pair = np.column_stack(
+                    [X[:, i], X[:, j] if j < n_features else X[:, i]]
+                )
+                Y_pair = np.column_stack(
+                    [Y[:, i], Y[:, j] if j < n_features else Y[:, i]]
+                )
 
                 X_h = HadamardRZKernels._apply_hadamard_transform(X_pair, 0.7)
                 Y_h = HadamardRZKernels._apply_hadamard_transform(Y_pair, 0.7)
@@ -415,6 +458,7 @@ class HadamardRZKernels:
                 kernel_matrix += weight * pair_kernel
 
         return kernel_matrix
+
 
 class QuantumInspiredSVM:
     """Wrapper class for easy kernel experimentation"""
@@ -437,7 +481,7 @@ class QuantumInspiredSVM:
         K_train = self._ensure_psd(K_train)
 
         # Train SVM
-        self.svm = SVC(kernel='precomputed', C=self.C, probability=True)
+        self.svm = SVC(kernel="precomputed", C=self.C, probability=True)
         self.svm.fit(K_train, y)
         return self
 
@@ -464,6 +508,7 @@ class QuantumInspiredSVM:
             K += 1e-8 * np.eye(K.shape[0])
         return K
 
+
 class HadamardRZSVM:
     """Wrapper for Hadamard+RZ inspired SVM"""
 
@@ -487,7 +532,7 @@ class HadamardRZSVM:
         K_train = self._regularize_kernel(K_train)
 
         # Train SVM
-        self.svm = SVC(kernel='precomputed', C=self.C, probability=True)
+        self.svm = SVC(kernel="precomputed", C=self.C, probability=True)
         self.svm.fit(K_train, y)
         return self
 

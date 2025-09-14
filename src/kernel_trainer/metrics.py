@@ -12,12 +12,9 @@ from scipy.special import rel_entr  # kl_div
 from tqdm import trange
 
 from qiskit import QuantumCircuit
-from qiskit.quantum_info import (
-    DensityMatrix,
-    partial_trace,
-    Statevector
-)
+from qiskit.quantum_info import DensityMatrix, partial_trace, Statevector
 from qiskit_aer import AerSimulator
+
 
 def qiskit_target_alignment(kernel: QuantumCircuit, X: np.array, y: np.array):
     """
@@ -62,6 +59,7 @@ def qiskit_target_alignment(kernel: QuantumCircuit, X: np.array, y: np.array):
 
     return alignment
 
+
 def qiskit_centered_target_alignment(kernel: QuantumCircuit, X: np.array, y: np.array):
     """
     Compute Centered Kernel Alignment (CKA) between kernel matrix and target.
@@ -71,11 +69,11 @@ def qiskit_centered_target_alignment(kernel: QuantumCircuit, X: np.array, y: np.
     [1]: Cortes et al.,
     "Algorithms for Learning Kernels Based on Centered Alignment",
     `https://arxiv.org/pdf/1203.0550`_.
-    
+
     Args:
         kmatrix: Kernel matrix K (n x n)
         y: Target vector (n,)
-    
+
     Returns:
         float: CKA score
     """
@@ -89,7 +87,7 @@ def qiskit_centered_target_alignment(kernel: QuantumCircuit, X: np.array, y: np.
     _Y = np.array([y / nplus if y == 1 else y / nminus for y in y])
 
     # Create centering matrix H = I - (1/n) * 1 * 1^T
-    H = np.eye(n) - (1/n) * np.ones((n, n))
+    H = np.eye(n) - (1 / n) * np.ones((n, n))
 
     # Center the kernel matrix: HKH
     centered_kmatrix = H @ kmatrix @ H
@@ -97,7 +95,7 @@ def qiskit_centered_target_alignment(kernel: QuantumCircuit, X: np.array, y: np.
     # Target matrix (outer product of y)
     T = np.outer(_Y, _Y)
 
-    # Center the target matrix: HTH  
+    # Center the target matrix: HTH
     centered_T = H @ T @ H
 
     # Compute CKA using the Frobenius inner product
@@ -111,6 +109,7 @@ def qiskit_centered_target_alignment(kernel: QuantumCircuit, X: np.array, y: np.
 
     return inner_product / (norm_k * norm_t)
 
+
 def schmidt_decomp(qc: QuantumCircuit):
     """
     Schmidt decomposition
@@ -123,7 +122,9 @@ def schmidt_decomp(qc: QuantumCircuit):
     state_array = state.data
 
     # Reshape the state vector into a matrix for the SVD
-    matrix = state_array.reshape(qc.num_qubits, qc.num_qubits)  # Reshape for a 2x2 matrix
+    matrix = state_array.reshape(
+        qc.num_qubits, qc.num_qubits
+    )  # Reshape for a 2x2 matrix
 
     # Perform SVD
     _, s, _ = np.linalg.svd(matrix)
@@ -136,6 +137,7 @@ def schmidt_decomp(qc: QuantumCircuit):
     schmidt_number = np.sum(s > 1e-10)
 
     return schmidt_number, schmidt_coefficients
+
 
 class Expressivity:
     """Expressivity measures as the capacity of a circuit
@@ -177,7 +179,8 @@ class Expressivity:
         self.p_haar_hist = []
         for i in range(self.dims - 1):
             self.p_haar_hist.append(
-                (1 - self.bins_list[i]) ** (2**num - 1) - (1 - self.bins_list[i + 1]) ** (2**num - 1)
+                (1 - self.bins_list[i]) ** (2**num - 1)
+                - (1 - self.bins_list[i + 1]) ** (2**num - 1)
             )
 
     def plot(self):

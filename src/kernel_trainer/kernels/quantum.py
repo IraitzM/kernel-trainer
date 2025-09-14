@@ -7,7 +7,8 @@ import pennylane as qml
 
 from qiskit import QuantumCircuit
 from qiskit.primitives import Sampler
-#from qiskit_aer.primitives import Sampler
+
+# from qiskit_aer.primitives import Sampler
 from qiskit.circuit import Parameter
 from qiskit.circuit.library import ZFeatureMap
 from qiskit_algorithms.state_fidelities import ComputeUncompute
@@ -19,7 +20,7 @@ from kernel_trainer.metrics import (
     qiskit_target_alignment,
     qiskit_centered_target_alignment,
     EntanglingCapacity,
-    Expressivity
+    Expressivity,
 )
 
 from loguru import logger
@@ -315,6 +316,7 @@ def ind_to_qiskit_kernel(
 
     return kernel
 
+
 def get_stats(individual, num_qubits):
     """
     Gets some key statistics for a feature map individual
@@ -326,9 +328,9 @@ def get_stats(individual, num_qubits):
 
     qc = QuantumCircuit(num_qubits, num_qubits)
     qc.compose(kernel_auto.feature_map, inplace=True)
-    qc.measure([x for x in range(num_qubits)],[x for x in range(num_qubits)])
+    qc.measure([x for x in range(num_qubits)], [x for x in range(num_qubits)])
 
-    expr = Expressivity(dims = 120)
+    expr = Expressivity(dims=120)
     expr_m = expr.calculate(qc, nshots=10_000, samples=4_000)
 
     ent_cap = EntanglingCapacity(qc)
@@ -336,14 +338,15 @@ def get_stats(individual, num_qubits):
 
     return depth, expr_m, entang
 
+
 def evaluation_function(
     individual,
     X: np.ndarray,
     y: np.ndarray,
     backend: str = "pennylane",
-    metric: str = 'KTA',
+    metric: str = "KTA",
     penalize_complexity: bool = False,
-    cache : dict = None
+    cache: dict = None,
 ):
     """Creates the evaluator function
 
@@ -393,7 +396,7 @@ def evaluation_function(
         mask = (qubit_alloc > 0).tolist()
 
         try:
-            if metric == 'KTA':
+            if metric == "KTA":
                 fit_score = qiskit_target_alignment(kernel, X[:, mask], y)
             else:
                 fit_score = qiskit_centered_target_alignment(kernel, X[:, mask], y)
@@ -414,13 +417,13 @@ def evaluation_function(
 
     return (fit_score,)
 
-def get_matrices(X_train, X_test, y_train, fm: str = 'Z'):
 
+def get_matrices(X_train, X_test, y_train, fm: str = "Z"):
     num_dim = X_train.shape[1]
 
-    if fm == 'Z':
+    if fm == "Z":
         kernel = qiskit_pauli_kernel(dims=num_dim, paulis=None)
-    elif fm == 'ZZ':
+    elif fm == "ZZ":
         from qiskit.circuit.library import ZZFeatureMap
 
         sampler = Sampler()
@@ -437,8 +440,8 @@ def get_matrices(X_train, X_test, y_train, fm: str = 'Z'):
 
     return matrix_train, matrix_test, cka
 
-def get_matrices_ind(X_train, X_test, y_train, ind: list):
 
+def get_matrices_ind(X_train, X_test, y_train, ind: list):
     num_dim = X_train.shape[1]
     qc = QuantumCircuit(num_dim)
 
