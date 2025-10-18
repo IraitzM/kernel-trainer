@@ -66,7 +66,7 @@ def pennylane_pauli_kernel(
                     for i in range(n_qubits):
                         if hadamard:
                             qml.Hadamard(i)
-                        qml.PauliRot(2 * x1[i], w, wires=i)
+                        qml.PauliRot(2 * (np.pi - x1[i]), w, wires=i)
                 elif len(w) == 2 and entanglement == "linear":
                     for i in range(n_qubits - 1):
                         qml.PauliRot(
@@ -86,7 +86,7 @@ def pennylane_pauli_kernel(
             for w in reversed(paulis):
                 if len(w) == 1:
                     for i in reversed(range(n_qubits)):
-                        qml.PauliRot(-(2 * x2[i]), w, wires=i)
+                        qml.PauliRot(-(2 *(np.pi - x2[i])), w, wires=i)
                         if hadamard:
                             qml.Hadamard(i)
                 elif len(w) == 2 and entanglement == "linear":
@@ -140,11 +140,11 @@ def qiskit_pauli_kernel(
                 if len(word) == 1:
                     idx = word.index(w)
                     if w == "X":
-                        feature_map.rx(theta=2 * (x[idx]), qubit=idx)
+                        feature_map.rx(theta=2 * (np.pi - x[idx]), qubit=idx)
                     elif w == "Y":
-                        feature_map.ry(theta=2 * (x[idx]), qubit=idx)
+                        feature_map.ry(theta=2 * (np.pi - x[idx]), qubit=idx)
                     else:
-                        feature_map.rz(phi=2 * (x[idx]), qubit=idx)
+                        feature_map.rz(phi=2 * (np.pi - x[idx]), qubit=idx)
                 else:
                     # Basis change block
                     indexes = []

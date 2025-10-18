@@ -31,7 +31,7 @@ class Preprocessor:
         self.scale = scale
 
         if scale:
-            self.scaler = MinMaxScaler((0, 2 * np.pi))
+            self.scaler = MinMaxScaler((0, np.pi))
 
         if self.mode == "lda":
             self.kmeans = KMeans(n_clusters=self.ndims, random_state=0, n_init=10)
