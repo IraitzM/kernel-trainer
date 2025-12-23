@@ -44,4 +44,11 @@ notebooks = [
     "pylatexenc>=2.10",
     "plotly>=6.1.2",
     "nbformat>=5.10.4",
+    "marimo>=0.18.4",
 ]
+
+[tool.marimo.runtime]
+auto_instantiate = false
+on_cell_change = "lazy"
+[tool.marimo.display]
+cell_output = "below"
