@@ -1,6 +1,6 @@
 [project]
 name = "kernel-trainer"
-version = "0.1.6"
+version = "0.1.7"
 description = "A library enabling the training process for feature map training."
 authors = [
     {name = "Iraitz", email = "iraitzm@gmail.com"},
