@@ -1,11 +1,12 @@
 import time
 import random
 import numpy as np
+from tqdm import tqdm
 
-import multiprocessing
 from loguru import logger
 from itertools import product
 from deap import base, creator, tools, algorithms
+from multiprocessing import Pool
 
 from kernel_trainer.kernels import evaluation_function
 
@@ -40,14 +41,18 @@ def initRD(icls, scls, num_params):
 
 
 def initES(icls, scls, size):
-    """ """
+    """
+    Initialize the population
+    """
     ind = icls(random.choice(range(4)) for _ in range(size))
     ind.strategy = scls(random.choice(range(4)) for _ in range(size))
     return ind
 
 
 def mutate(individual):
-    # Do some hard computing on the individual
+    """
+    Mutate individual
+    """
     idx = random.choice(range(len(individual)))
     individual[idx] = (individual[idx] + 1) % 4
 
@@ -55,7 +60,9 @@ def mutate(individual):
 
 
 def mutate_rnd(individual):
-    # Do some hard computing on the individual
+    """
+    Mutate individual
+    """
     idx = random.choice(range(len(individual)))
     individual[idx] += np.random.normal(0, np.pi / 2)  # Modified mutation
 
@@ -75,7 +82,6 @@ def kernel_generator(
     processes: int = 1,
     penalize_complexity: bool = False,
     tournament_size: int = 10,
-    cache: dict = None,
 ):
     """
     Iterated over a population of potential kernels checking
@@ -107,7 +113,7 @@ def kernel_generator(
     toolbox.register("select", tools.selTournament, tournsize=tournament_size)
 
     # Distributed
-    pool = multiprocessing.Pool(processes=processes)
+    pool = Pool(processes=processes, maxtasksperchild=1)
     toolbox.register("map", pool.map)
     toolbox.register(
         "evaluate",
@@ -117,8 +123,8 @@ def kernel_generator(
         backend=backend,
         metric=metric,
         penalize_complexity=penalize_complexity,
-        cache=cache,
     )
+    # Population
     population = toolbox.population(n=num_pop)
 
     # Set stats and logs
@@ -133,7 +139,10 @@ def kernel_generator(
 
     # Evaluate the individuals with an invalid fitness
     valid_ind = [ind for ind in population if not ind.fitness.valid]
-    fitnesses = toolbox.map(toolbox.evaluate, valid_ind)
+    fitnesses = toolbox.map(
+        toolbox.evaluate,
+        valid_ind
+    )
     for ind, fit in zip(valid_ind, fitnesses):
         ind.fitness.values = fit
 
@@ -142,7 +151,7 @@ def kernel_generator(
     logger.info(logbook.stream)
 
     # Begin the generational process
-    for gen in range(1, ngen + 1):
+    for gen in tqdm(range(1, ngen + 1)):
         start_time = time.time()
 
         # Select the next generation individuals

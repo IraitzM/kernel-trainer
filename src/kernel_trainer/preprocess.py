@@ -31,7 +31,7 @@ class Preprocessor:
         self.scale = scale
 
         if scale:
-            self.scaler = MinMaxScaler((0, np.pi))
+            self.scaler = MinMaxScaler((-np.pi/2, np.pi/2)) # minimum value on the negative spectrum
 
         if self.mode == "lda":
             self.kmeans = KMeans(n_clusters=self.ndims, random_state=0, n_init=10)

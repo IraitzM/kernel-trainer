@@ -26,12 +26,17 @@ from kernel_trainer.dataset import DataGenerator
 from sklearn.svm import SVC
 from sklearn.metrics import roc_auc_score, f1_score
 
+from dotenv import load_dotenv, find_dotenv
+
+load_dotenv(find_dotenv(), override=True)
+
 # Logs
 logger.remove(0)
 logger.add(
     sys.stdout,
     colorize=True,
     format="{time:YYYY-MM-DD at HH:mm:ss} | {level} | {message}",
+    level=os.getenv("LOG_LEVEL")
 )
 
 
@@ -61,7 +66,6 @@ def cli(ctx, **kwargs):
 @p.out_path
 @p.metric
 @p.algo
-@p.cache
 def train(**kwargs):
     # Load CSV file
     file_path = kwargs.get("file_path")
@@ -120,8 +124,6 @@ def train(**kwargs):
             "backend": kwargs.get("backend", "qiskit"),
             "metric": kwargs.get("metric", "CKA"),
         }
-        if "cache" in kwargs:
-            config["cache"] = {}
 
         pop_final, log = kernel_generator(**config)
 

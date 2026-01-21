@@ -2,7 +2,7 @@
 Metrics to be used for both evolutionary search and
 kernel evaluation (expresivity and entanglement capacity)
 """
-
+import gc
 import numpy as np
 from math import pi
 from random import random
@@ -15,8 +15,11 @@ from qiskit import QuantumCircuit
 from qiskit.quantum_info import DensityMatrix, partial_trace, Statevector
 from qiskit_aer import AerSimulator
 
+import os
+import psutil
 
-def qiskit_target_alignment(kernel: QuantumCircuit, X: np.array, y: np.array):
+
+def qiskit_target_alignment(kernel: QuantumCircuit, X: np.array, y: np.array, logger = None):
     """
     Target alignment loss function.
     The definition of the function is taken from Equation (27,28) of [1].
@@ -42,9 +45,13 @@ def qiskit_target_alignment(kernel: QuantumCircuit, X: np.array, y: np.array):
     Returns:
         _type_: _description_
     """
-
     # Get estimated kernel matrix
     kmatrix = kernel.evaluate(X)
+
+    if logger:
+        proc = psutil.Process(os.getpid())
+        ram_used = proc.memory_info().rss / (1024 * 1024)
+        logger.debug(f"Kernel evaluated at {proc.pid} (MEM: {round(ram_used, 2)})")
 
     # Rescale
     nplus = np.count_nonzero(np.array(y) == 1)
@@ -57,10 +64,14 @@ def qiskit_target_alignment(kernel: QuantumCircuit, X: np.array, y: np.array):
     norm = np.sqrt(np.sum(kmatrix * kmatrix) * np.sum(T * T))
     alignment = inner_product / norm
 
+    # Free resources
+    del kmatrix
+    gc.collect()
+
     return alignment
 
 
-def qiskit_centered_target_alignment(kernel: QuantumCircuit, X: np.array, y: np.array):
+def qiskit_centered_target_alignment(kernel: QuantumCircuit, X: np.array, y: np.array, logger = None):
     """
     Compute Centered Kernel Alignment (CKA) between kernel matrix and target.
 
@@ -79,6 +90,11 @@ def qiskit_centered_target_alignment(kernel: QuantumCircuit, X: np.array, y: np.
     """
     # Get estimated kernel matrix
     kmatrix = kernel.evaluate(X)
+
+    if logger:
+        proc = psutil.Process(os.getpid())
+        ram_used = proc.memory_info().rss / (1024 * 1024)
+        logger.debug(f"Kernel evaluated at {proc.pid} (MEM: {round(ram_used, 2)})")
 
     n = len(y)
     # Rescale
@@ -106,6 +122,10 @@ def qiskit_centered_target_alignment(kernel: QuantumCircuit, X: np.array, y: np.
     # Handle edge case where norms are zero
     if norm_k == 0 or norm_t == 0:
         return 0.0
+
+    # Free resources
+    del kmatrix
+    gc.collect()
 
     return inner_product / (norm_k * norm_t)
 

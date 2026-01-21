@@ -1,7 +1,7 @@
 """
 Lists predefined kernel structures
 """
-
+import time
 import numpy as np
 import pennylane as qml
 
@@ -23,6 +23,8 @@ from kernel_trainer.metrics import (
     Expressivity,
 )
 
+import os
+import psutil
 from loguru import logger
 from joblib import Parallel, delayed
 from deap import base, creator
@@ -86,7 +88,7 @@ def pennylane_pauli_kernel(
             for w in reversed(paulis):
                 if len(w) == 1:
                     for i in reversed(range(n_qubits)):
-                        qml.PauliRot(-(2 *(np.pi - x2[i])), w, wires=i)
+                        qml.PauliRot(-(2 * (np.pi - x2[i])), w, wires=i)
                         if hadamard:
                             qml.Hadamard(i)
                 elif len(w) == 2 and entanglement == "linear":
@@ -234,7 +236,6 @@ def compute_kernel_matrix(kernel_func):
         filled with results from the Kernel
         function.
         """
-
         rows = Parallel(n_jobs=-1, verbose=10)(
             delayed(kernel_func)(a, np.transpose(B)) for a in A
         )
@@ -346,7 +347,6 @@ def evaluation_function(
     backend: str = "pennylane",
     metric: str = "KTA",
     penalize_complexity: bool = False,
-    cache: dict = None,
 ):
     """Creates the evaluator function
 
@@ -362,13 +362,6 @@ def evaluation_function(
     # No operation
     if sum(individual) == 0:
         return (fit_score,)
-
-    # Check cache
-    if cache:
-        ind_string = "".join([str(x) for x in individual])
-        logger.info(f"Looking for ind {ind_string}")
-        if ind_string in cache:
-            return cache[ind_string]
 
     if backend == "pennylane":
         device = qml.device("qulacs.simulator", wires=X.shape[1])  # lightning.gpu
@@ -386,9 +379,13 @@ def evaluation_function(
             fit_score = fit_score * non_local_gates * depth
 
     elif backend == "qiskit":
+        start_time = time.time()
         qc = QuantumCircuit(X.shape[1])
 
         # Do some hard computing on the individual
+        proc = psutil.Process(os.getpid())
+        ram_used = proc.memory_info().rss / (1024 * 1024)
+        logger.debug(f"Creating individual in process {proc.pid} (MEM: {round(ram_used, 2)} MB)")
         kernel = ind_to_qiskit_kernel(individual, qc)
 
         # Mask that fixes qiskit's idle qubit removal
@@ -396,24 +393,26 @@ def evaluation_function(
         mask = (qubit_alloc > 0).tolist()
 
         try:
+            ram_used = proc.memory_info().rss / (1024 * 1024)
+            logger.debug(f"Going for the proxy metric {proc.pid} (MEM: {round(ram_used, 2)})")
             if metric == "KTA":
-                fit_score = qiskit_target_alignment(kernel, X[:, mask], y)
+                fit_score = qiskit_target_alignment(kernel, X[:, mask], y, logger)
             else:
-                fit_score = qiskit_centered_target_alignment(kernel, X[:, mask], y)
+                fit_score = qiskit_centered_target_alignment(kernel, X[:, mask], y, logger)
 
+            # Penalization if circuit is deep
             if penalize_complexity:
                 non_local_gates = kernel.feature_map.num_nonlocal_gates()
                 depth = kernel.feature_map.depth()
-
                 fit_score = fit_score * non_local_gates * depth
 
+            ram_used = proc.memory_info().rss / (1024 * 1024)
+            logger.debug(f"Finishing {proc.pid} (MEM: {round(ram_used, 2)})")
+            timediff = time.time() - start_time
+            logger.debug(f"Proxy calculation on {proc.pid} took {timediff} (proc. time {time.process_time()})")
         except Exception as e:
             # Some individuals raise issues when building the target alignment
             logger.error(f"{individual}: {e}")
-
-    # Cache
-    if cache:
-        cache[ind_string] = (fit_score,)
 
     return (fit_score,)
 
