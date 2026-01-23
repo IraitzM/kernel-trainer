@@ -6,9 +6,7 @@ import numpy as np
 import pennylane as qml
 
 from qiskit import QuantumCircuit
-from qiskit.primitives import Sampler
-
-# from qiskit_aer.primitives import Sampler
+from qiskit.primitives import StatevectorSampler as Sampler
 from qiskit.circuit import Parameter
 from qiskit.circuit.library import ZFeatureMap
 from qiskit_algorithms.state_fidelities import ComputeUncompute
@@ -364,9 +362,14 @@ def evaluation_function(
         return (fit_score,)
 
     if backend == "pennylane":
+        start_time = time.time()
+        proc = psutil.Process(os.getpid())
+        ram_used = proc.memory_info().rss / (1024 * 1024)
+        logger.debug(f"Creating individual in process {proc.pid} (MEM: {round(ram_used, 2)} MB)")
         device = qml.device("qulacs.simulator", wires=X.shape[1])  # lightning.gpu
         kernel = ind_to_pennylane_kernel(individual, device)
 
+        logger.debug(f"Going for KTA proxy metric {proc.pid} (MEM: {round(ram_used, 2)} MB)")
         fit_score = qml.kernels.target_alignment(X, y, lambda x1, x2: kernel(x1, x2)[0])
 
         if penalize_complexity:
@@ -377,6 +380,11 @@ def evaluation_function(
             non_local_gates = resources.gate_types["PauliRot"]
 
             fit_score = fit_score * non_local_gates * depth
+
+        ram_used = proc.memory_info().rss / (1024 * 1024)
+        logger.debug(f"Finishing {proc.pid} (MEM: {round(ram_used, 2)} MB)")
+        timediff = time.time() - start_time
+        logger.debug(f"Proxy calculation on {proc.pid} took {timediff} (proc. time {time.process_time()})")
 
     elif backend == "qiskit":
         start_time = time.time()
@@ -394,7 +402,7 @@ def evaluation_function(
 
         try:
             ram_used = proc.memory_info().rss / (1024 * 1024)
-            logger.debug(f"Going for the proxy metric {proc.pid} (MEM: {round(ram_used, 2)})")
+            logger.debug(f"Going for the proxy metric {proc.pid} (MEM: {round(ram_used, 2)} MB)")
             if metric == "KTA":
                 fit_score = qiskit_target_alignment(kernel, X[:, mask], y, logger)
             else:
@@ -407,7 +415,7 @@ def evaluation_function(
                 fit_score = fit_score * non_local_gates * depth
 
             ram_used = proc.memory_info().rss / (1024 * 1024)
-            logger.debug(f"Finishing {proc.pid} (MEM: {round(ram_used, 2)})")
+            logger.debug(f"Finishing {proc.pid} (MEM: {round(ram_used, 2)} MB)")
             timediff = time.time() - start_time
             logger.debug(f"Proxy calculation on {proc.pid} took {timediff} (proc. time {time.process_time()})")
         except Exception as e:
