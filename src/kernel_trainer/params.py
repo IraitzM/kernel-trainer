@@ -27,6 +27,14 @@ mode = click.option(
     prompt=True,
 )
 
+backend = click.option(
+    "--backend",
+    envvar=None,
+    help="Backend to be used",
+    default="qiskit",
+    type=click.Choice(["qiskit", "pennylane"]),
+)
+
 generations = click.option(
     "--generations",
     envvar=None,

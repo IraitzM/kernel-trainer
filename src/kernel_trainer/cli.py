@@ -66,6 +66,7 @@ def cli(ctx, **kwargs):
 @p.out_path
 @p.metric
 @p.algo
+@p.backend
 def train(**kwargs):
     # Load CSV file
     file_path = kwargs.get("file_path")
