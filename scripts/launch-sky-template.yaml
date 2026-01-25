@@ -1,0 +1,23 @@
+resources:
+  # Optional; if left out, automatically pick the cheapest cloud.
+  infra: nebius
+  # 8x NVIDIA A100 GPU
+  cpus: 16+
+  memory: 32+
+
+# Working directory (optional) containing the project codebase.
+# Its contents are synced to ~/sky_workdir/ on the cluster.
+workdir: .
+
+# Typical use: pip install -r requirements.txt
+# Invoked under the workdir (i.e., can use its files).
+setup: |
+  echo "Running setup."
+  pip install uv
+  uv sync
+
+# Typical use: make use of resources, such as running training.
+# Invoked under the workdir (i.e., can use its files).
+run: |
+  echo "Launching job!"
+  uv run ktrainer search ...

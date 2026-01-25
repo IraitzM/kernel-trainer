@@ -1,6 +1,27 @@
 import click
 from pathlib import Path
 
+class Union(click.ParamType):
+    def __init__(self, types):
+        self.types = types
+
+    def convert(self, value, param, ctx):
+        for type_ in self.types:
+            try:
+                return type_.convert(value, param, ctx)
+            except click.BadParameter:
+                continue
+        self.fail(f"Didn't match any of the accepted types: {self.types}")
+
+dataset = click.option(
+    "--dataset",
+    envvar=None,
+    help="Select a known dataset from scikit-learn or local CSV file",
+    type=Union([click.Path(resolve_path=True, exists=True, path_type=Path), click.Choice(["iris", "breast-cancer", "wine", "monk"])]),
+    default=None,
+    prompt=True,
+)
+
 file_path = click.option(
     "--file-path",
     envvar=None,
@@ -108,6 +129,15 @@ dataset_id = click.option(
     type=click.Choice(["0", "1a", "1b", "1c", "2a", "2b", "2c", "3a", "3b", "3c"]),
     prompt=True,
 )
+
+id = click.option(
+    "--id",
+    envvar=None,
+    help="Dataset ID",
+    default=None,
+    type=click.STRING
+)
+
 
 metric = click.option(
     "--metric",

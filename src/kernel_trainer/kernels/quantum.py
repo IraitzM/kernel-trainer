@@ -17,6 +17,7 @@ from qiskit_machine_learning.kernels import (
 from kernel_trainer.metrics import (
     qiskit_target_alignment,
     qiskit_centered_target_alignment,
+    pennylane_centered_kernel_alignment,
     EntanglingCapacity,
     Expressivity,
 )
@@ -369,8 +370,12 @@ def evaluation_function(
         device = qml.device("qulacs.simulator", wires=X.shape[1])  # lightning.gpu
         kernel = ind_to_pennylane_kernel(individual, device)
 
-        logger.debug(f"Going for KTA proxy metric {proc.pid} (MEM: {round(ram_used, 2)} MB)")
-        fit_score = qml.kernels.target_alignment(X, y, lambda x1, x2: kernel(x1, x2)[0])
+        if metric == "KTA":
+            logger.debug(f"Going for KTA proxy metric {proc.pid} (MEM: {round(ram_used, 2)} MB)")
+            fit_score = qml.kernels.target_alignment(X, y, lambda x1, x2: kernel(x1, x2)[0])
+        else:
+            logger.debug(f"Going for CKA proxy metric {proc.pid} (MEM: {round(ram_used, 2)} MB)")
+            fit_score = pennylane_centered_kernel_alignment(X, y, kernel)
 
         if penalize_complexity:
             specs = qml.specs(qnode=kernel)(X[0], X[0])

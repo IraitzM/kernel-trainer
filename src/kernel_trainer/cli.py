@@ -36,7 +36,7 @@ logger.add(
     sys.stdout,
     colorize=True,
     format="{time:YYYY-MM-DD at HH:mm:ss} | {level} | {message}",
-    level=os.getenv("LOG_LEVEL")
+    level=os.getenv("LOG_LEVEL", "INFO")
 )
 
 
@@ -54,7 +54,7 @@ def cli(ctx, **kwargs):
 
 
 @cli.command("search")
-@p.file_path
+@p.dataset
 @p.dimensions
 @p.mode
 @p.generations
@@ -68,36 +68,95 @@ def cli(ctx, **kwargs):
 @p.algo
 @p.backend
 def train(**kwargs):
-    # Load CSV file
-    file_path = kwargs.get("file_path")
+    # Load data
+    dataset = kwargs.get("dataset")
+    num_dimensions = kwargs.get("dims")
+    mode = kwargs.get("mode")
 
-    # Directory
-    if file_path.is_dir():
-        # List all CSV
-        csv_files = list(file_path.glob("**/*.csv"))
-        # Read each CSV file into a DataFrame and append to a list
-        dataframes = [pd.read_csv(file) for file in csv_files]
+    if not isinstance(dataset, str):
+        # Directory
+        if dataset.is_dir():
+            # List all CSV
+            csv_files = list(dataset.glob("**/*.csv"))
+            # Read each CSV file into a DataFrame and append to a list
+            dataframes = [pd.read_csv(file) for file in csv_files]
+            # Concatenate all DataFrames into a single DataFrame
+            data = pd.concat(dataframes, ignore_index=True)
+        else:
+            data = pd.read_csv(dataset)
 
-        # Concatenate all DataFrames into a single DataFrame
-        dataset = pd.concat(dataframes, ignore_index=True)
+        # Preprocess
+        prep = Preprocessor(num_dimensions, mode=mode, scale=True)
+        X_reduced = prep.fit_transform(data.drop(columns=["y"]))
+
+        # Split train and test
+        X_train, _, y_train, _ = train_test_split(
+            X_reduced, data["y"], test_size=0.20, random_state=42
+        )
+        logger.info(f"Training with {X_train.shape} dataset.")
     else:
-        dataset = pd.read_csv(file_path)
+        if dataset == "iris":
+            from sklearn.datasets import load_iris
+
+            # Load data
+            df_iris = load_iris(as_frame=True)
+            X_df = df_iris["data"]
+            y_df = df_iris["target"]
+
+            # Filter two most complex classes
+            X_masked = (X_df[y_df > 0]).to_numpy()
+            y_masked = (y_df[y_df > 0]).to_numpy()
+
+            _, num_dimensions = X_masked.shape
+
+            # Preprocess
+            prep = Preprocessor(num_dimensions, mode=mode, scale=True)
+            X_reduced = prep.fit_transform(X_masked)
+
+            # Split train and test
+            X_train, _, y_train, _ = train_test_split(
+                X_reduced, y_masked, test_size=0.20, random_state=42
+            )
+            logger.info(f"Training with {X_train.shape} dataset.")
+        elif dataset == "wine":
+            from sklearn.datasets import load_wine
+
+            # Load data
+            df_iris = load_wine(as_frame=True)
+            X_df = df_iris["data"]
+            y_df = df_iris["target"]
+
+            # Filter two most complex classes
+            X_masked = (X_df[y_df > 0]).to_numpy()
+            y_masked = (y_df[y_df > 0]).to_numpy()
+
+            _, num_dimensions = X_masked.shape
+
+            # Preprocess
+            prep = Preprocessor(num_dimensions, mode=mode, scale=True)
+            X_reduced = prep.fit_transform(X_masked)
+
+            # Split train and test
+            X_train, _, y_train, _ = train_test_split(
+                X_reduced, y_masked, test_size=0.20, random_state=42
+            )
+            logger.info(f"Training with {X_train.shape} dataset.")
+        elif dataset == "monk":
+            logger.error(f"Dataset {dataset} not yet implemented")
+            raise NotImplementedError
+        else:
+            logger.error(f"Dataset {dataset} not found!")
+            raise Exception()
 
     # Extract params
     algo = kwargs.get("algorithm")
-    num_dimensions = kwargs.get("dims")
-    mode = kwargs.get("mode")
     chain_size = kwargs.get("chain_size")
 
-    # Preprocess
-    prep = Preprocessor(num_dimensions, mode=mode, scale=True)
-    X_reduced = prep.fit_transform(dataset.drop(columns=["y"]))
-
-    # Split train and test
-    X_train, _, y_train, _ = train_test_split(
-        X_reduced, dataset["y"], test_size=0.20, random_state=42
-    )
-    logger.info(f"Training with {X_train.shape} dataset.")
+    # Check remainder
+    rem = chain_size % X_train.shape[1]
+    if rem > 0:
+        logger.error(f"Dataset is {X_train.shape} but your chain-size is {chain_size}, try multiples of dataset width")
+        raise Exception()
 
     # Select algo
     if algo == "brute-force":
@@ -130,7 +189,7 @@ def train(**kwargs):
 
     # Result
     results = {
-        "input": file_path,
+        "input": dataset,
         "kwargs": kwargs,
         "population": pop_final,
         "log": log,
@@ -179,34 +238,53 @@ def generate(**kwargs):
 
 @cli.command("stats")
 @p.file_path
+@p.id
 def stats(**kwargs):
     # Load result file
     file_path = kwargs.get("file_path")
 
-    # Data files
-    data = {
-        "1a": [],
-        "1b": [],
-        "1c": [],
-        "2a": [],
-        "2b": [],
-        "2c": [],
-        "3a": [],
-        "3b": [],
-        "3c": [],
-    }
+    identity = kwargs.get("id", None)
 
-    # Directory
-    if file_path.is_dir():
-        # List all files
-        for x in os.listdir(file_path):
-            if x.endswith(".pkl"):
-                dataset = x[:2]  # First chars
-                full_path = os.path.join(file_path, x)
-                with open(full_path, "rb") as file:
-                    tmp = pickle.load(file)
+    if identity:
+        data = {
+            identity : []
+        }
 
-                data[dataset].append(tmp)
+        # Directory
+        if file_path.is_dir():
+            # List all files
+            for x in os.listdir(file_path):
+                if x.endswith(".pkl") and identity in x:
+                    full_path = os.path.join(file_path, x)
+                    with open(full_path, "rb") as file:
+                        tmp = pickle.load(file)
+
+                    data[identity].append(tmp)
+    else:
+        # Data files
+        data = {
+            "1a": [],
+            "1b": [],
+            "1c": [],
+            "2a": [],
+            "2b": [],
+            "2c": [],
+            "3a": [],
+            "3b": [],
+            "3c": [],
+        }
+
+        # Directory
+        if file_path.is_dir():
+            # List all files
+            for x in os.listdir(file_path):
+                if x.endswith(".pkl"):
+                    dataset = x[:2]  # First chars
+                    full_path = os.path.join(file_path, x)
+                    with open(full_path, "rb") as file:
+                        tmp = pickle.load(file)
+
+                    data[dataset].append(tmp)
 
     # Summary table
     table = Table(title="Stats summary")
@@ -252,30 +330,99 @@ def stats(**kwargs):
 
 
 @cli.command("benchmark")
-@p.file_path
+@p.dataset
 @p.dimensions
 @p.mode
 def benchmark(**kwargs):
     # Load dataset
-    file_path = kwargs.get("file_path")
-
-    # Look for data
-    dataset = pd.read_csv(file_path)
-    dataset_id = file_path.name[:2]
-    logger.info(f"Dataset {dataset_id}")
-
-    # Extract params
+    dataset = kwargs.get("dataset")
     num_dimensions = kwargs.get("dims")
-    mode = kwargs.get("mode")
+    mode = kwargs.get("mode", "raw")
 
-    # Preprocess
-    prep = Preprocessor(num_dimensions, mode=mode, scale=True)
-    X_reduced = prep.fit_transform(dataset.drop(columns=["y"]))
+    dataset_id = None
+    if not isinstance(dataset, str):
+        # Look for data
+        dataset_id = dataset.name[:2]
 
-    # Split train and test
-    X_train, X_test, y_train, y_test = train_test_split(
-        X_reduced, dataset["y"], test_size=0.20, random_state=42
-    )
+        # Directory
+        if dataset.is_dir():
+            # List all CSV
+            csv_files = list(dataset.glob("**/*.csv"))
+            # Read each CSV file into a DataFrame and append to a list
+            dataframes = [pd.read_csv(file) for file in csv_files]
+            # Concatenate all DataFrames into a single DataFrame
+            data = pd.concat(dataframes, ignore_index=True)
+        else:
+            data = pd.read_csv(dataset)
+
+        # Preprocess
+        prep = Preprocessor(num_dimensions, mode=mode, scale=True)
+        X_reduced = prep.fit_transform(data.drop(columns=["y"]))
+
+        # Split train and test
+        X_train, _, y_train, _ = train_test_split(
+            X_reduced, data["y"], test_size=0.20, random_state=42
+        )
+        logger.info(f"Training with {X_train.shape} dataset.")
+    else:
+        # Id
+        dataset_id = dataset
+
+        if dataset == "iris":
+            from sklearn.datasets import load_iris
+
+            # Load data
+            df_iris = load_iris(as_frame=True)
+            X_df = df_iris["data"]
+            y_df = df_iris["target"]
+
+            # Filter two most complex classes
+            X_masked = (X_df[y_df > 0]).to_numpy()
+            y_masked = (y_df[y_df > 0]).to_numpy()
+
+            _, num_dimensions = X_masked.shape
+
+            # Preprocess
+            prep = Preprocessor(num_dimensions, mode=mode, scale=True)
+            X_reduced = prep.fit_transform(X_masked)
+
+            # Split train and test
+            X_train, X_test, y_train, y_test = train_test_split(
+                X_reduced, y_masked, test_size=0.20, random_state=42
+            )
+            logger.info(f"Training with {X_train.shape} dataset.")
+        elif dataset == "wine":
+            from sklearn.datasets import load_wine
+
+            # Load data
+            df_iris = load_wine(as_frame=True)
+            X_df = df_iris["data"]
+            y_df = df_iris["target"]
+
+            # Filter two most complex classes
+            X_masked = (X_df[y_df > 0]).to_numpy()
+            y_masked = (y_df[y_df > 0]).to_numpy()
+
+            _, num_dimensions = X_masked.shape
+
+            # Preprocess
+            prep = Preprocessor(num_dimensions, mode=mode, scale=True)
+            X_reduced = prep.fit_transform(X_masked)
+
+            # Split train and test
+            X_train, X_test, y_train, y_test = train_test_split(
+                X_reduced, y_masked, test_size=0.20, random_state=42
+            )
+            logger.info(f"Training with {X_train.shape} dataset.")
+        elif dataset == "monk":
+            logger.error(f"Dataset {dataset} not yet implemented")
+            raise NotImplementedError
+        else:
+            logger.error(f"Dataset {dataset} not found!")
+            raise Exception()
+
+    # Log
+    logger.info(f"Dataset {dataset}")
     logger.info(f"Training with {X_train.shape} dataset.")
 
     # Find best result
@@ -301,6 +448,7 @@ def benchmark(**kwargs):
 
     # Classical
     for svc_type in ["linear", "poly", "rbf", "sin", "expsine"]:
+        logger.debug(f"Running {svc_type} training")
         if svc_type == "expsine":
             model = SVC(kernel=expsine2_kernel, probability=True, random_state=42)
         elif svc_type == "sin":
@@ -317,6 +465,7 @@ def benchmark(**kwargs):
 
     # Quantum
     for qsvc in ["Z", "ZZ"]:
+        logger.debug(f"Running {qsvc} QSVM training")
         m_train, m_test, cka = get_matrices(X_train, X_test, y_train, qsvc)
 
         model = SVC(kernel="precomputed", probability=True, random_state=42)

@@ -1,6 +1,6 @@
 [project]
 name = "kernel-trainer"
-version = "0.1.7"
+version = "0.1.8"
 description = "A library enabling the training process for feature map training."
 authors = [
     {name = "Iraitz", email = "iraitzm@gmail.com"},
@@ -47,6 +47,9 @@ notebooks = [
     "plotly>=6.1.2",
     "nbformat>=5.10.4",
     "marimo>=0.18.4",
+]
+remote = [
+    "skypilot[nebius]>=0.11.1",
 ]
 
 [tool.marimo.runtime]

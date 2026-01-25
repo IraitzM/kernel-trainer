@@ -9,14 +9,15 @@ from random import random
 import matplotlib.pyplot as plt
 from scipy.special import rel_entr  # kl_div
 
-from tqdm import trange
-
+import numpy as np
+from pennylane.kernels.utils import square_kernel_matrix
 from qiskit import QuantumCircuit
 from qiskit.quantum_info import DensityMatrix, partial_trace, Statevector
 from qiskit_aer import AerSimulator
 
 import os
 import psutil
+from tqdm import trange
 
 
 def qiskit_target_alignment(kernel: QuantumCircuit, X: np.array, y: np.array, logger = None):
@@ -158,6 +159,107 @@ def schmidt_decomp(qc: QuantumCircuit):
 
     return schmidt_number, schmidt_coefficients
 
+
+def pennylane_centered_kernel_alignment(
+    X,
+    Y,
+    kernel,
+    assume_normalized_kernel=False,
+):
+    r"""Centered kernel alignment of a given kernel function.
+
+    Centered kernel alignment (CKA) is a similarity index that measures the 
+    relationship between representational similarity matrices. Unlike regular 
+    kernel-target alignment, CKA centers the kernel matrices before computing 
+    alignment, making it invariant to isotropic scaling.
+
+    For a dataset with feature vectors :math:`\{x_i\}` and associated labels 
+    :math:`\{y_i\}`, the centered kernel alignment is given by:
+
+    .. math ::
+
+        \operatorname{CKA}(K, L) = \frac{\operatorname{HSIC}(K, L)}
+        {\sqrt{\operatorname{HSIC}(K, K)\operatorname{HSIC}(L, L)}}
+
+    where :math:`\operatorname{HSIC}` is the Hilbert-Schmidt Independence Criterion:
+
+    .. math ::
+
+        \operatorname{HSIC}(K, L) = \frac{1}{(n-1)^2}\operatorname{tr}(KHLH)
+
+    Here, :math:`H = I_n - \frac{1}{n}\mathbf{1}\mathbf{1}^T` is the centering matrix,
+    :math:`K` is the kernel matrix for features :math:`X`, and :math:`L` is the 
+    kernel matrix for labels :math:`Y`.
+
+    For binary classification with labels :math:`y_i \in \{-1, 1\}`, the label 
+    kernel is typically :math:`L_{ij} = y_i y_j`.
+
+    Args:
+        X (list[datapoint]): List of datapoints.
+        Y (list[float]): List of class labels of datapoints, assumed to be either -1 or 1.
+        kernel ((datapoint, datapoint) -> float): Kernel function that maps datapoints 
+            to kernel value.
+        assume_normalized_kernel (bool, optional): Assume that the kernel is normalized, 
+            i.e. the kernel evaluates to 1 when both arguments are the same datapoint.
+
+    Returns:
+        float: The centered kernel alignment.
+
+    **Example:**
+
+    Consider a simple kernel function based on :class:`~.templates.embeddings.AngleEmbedding`:
+
+    .. code-block:: python
+
+        dev = qml.device('default.qubit', wires=2)
+        @qml.qnode(dev)
+        def circuit(x1, x2):
+            qml.templates.AngleEmbedding(x1, wires=dev.wires)
+            qml.adjoint(qml.templates.AngleEmbedding)(x2, wires=dev.wires)
+            return qml.probs(wires=dev.wires)
+
+        kernel = lambda x1, x2: circuit(x1, x2)[0]
+
+    We can then compute the centered kernel alignment on a set of 4 (random) 
+    feature vectors ``X`` with labels ``Y`` via
+
+    >>> rng = np.random.default_rng(seed=1234)
+    >>> X = rng.random((4, 2))
+    >>> Y = np.array([-1, -1, 1, 1])
+    >>> qml.kernels.centered_kernel_alignment(X, Y, kernel)
+    np.float64(0.0582...)
+
+    **References:**
+
+    [1] Kornblith et al., "Similarity of Neural Network Representations Revisited"
+        https://arxiv.org/abs/1905.00414
+    """
+    n = len(X)
+
+    # Compute kernel matrices
+    K = square_kernel_matrix(X, kernel, assume_normalized_kernel=assume_normalized_kernel)
+
+    # Compute target kernel matrix (outer product of labels)
+    _Y = np.array(Y)
+    L = np.outer(_Y, _Y)
+
+    # Construct centering matrix H = I - (1/n) * 1 * 1^T
+    H = np.eye(n) - np.ones((n, n)) / n
+
+    # Center the kernel matrices: K_centered = H @ K @ H
+    K_centered = H @ K @ H
+    L_centered = H @ L @ H
+
+    # Compute HSIC values
+    # HSIC(K, L) = (1/(n-1)^2) * tr(K_centered @ L_centered)
+    hsic_KL = np.trace(K_centered @ L_centered) / ((n - 1) ** 2)
+    hsic_KK = np.trace(K_centered @ K_centered) / ((n - 1) ** 2)
+    hsic_LL = np.trace(L_centered @ L_centered) / ((n - 1) ** 2)
+
+    # Compute CKA
+    cka = hsic_KL / np.sqrt(hsic_KK * hsic_LL)
+
+    return cka
 
 class Expressivity:
     """Expressivity measures as the capacity of a circuit

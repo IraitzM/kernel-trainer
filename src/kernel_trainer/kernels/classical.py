@@ -5,8 +5,7 @@ Lists predefined classical kernel structures
 import numpy as np
 from sklearn.svm import SVC
 from sklearn.gaussian_process.kernels import ExpSineSquared
-from sklearn.metrics import accuracy_score, roc_auc_score
-
+from sklearn.metrics import roc_auc_score
 
 # Sin kernel
 def sin_kernel(X, Y):
