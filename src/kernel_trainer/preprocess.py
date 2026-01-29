@@ -13,25 +13,33 @@ from sklearn.discriminant_analysis import LinearDiscriminantAnalysis as LDA
 
 class Preprocessor:
     """
-    Implements preprocessing steps
+    Preprocessor that supports ``raw``, ``pca``, ``lda`` and ``tsne`` modes.
+
+    The class provides ``fit``, ``transform`` and ``fit_transform`` methods to
+    reduce the dimensionality of tabular feature data.
     """
 
     def __init__(self, dimensions: int, mode: str = "tsne", scale: bool = False):
         """
-        Initialize preprocessing class
+        Initialize the preprocessor.
 
-        Args:
-            dimensions (int): Number of dimensions original
-        dataset should be reduced to.
-            mode (str): Accepts different modes with with the dataset should be
-        reduced in the number of features [raw, pca, lda, tsne]
+        Parameters
+        ----------
+        dimensions : int
+            Target dimensionality after reduction.
+        mode : {"raw", "pca", "lda", "tsne"}, optional
+            Reduction mode (default ``"tsne"``).
+        scale : bool, optional
+            If True, scale features into ``(-pi/2, pi/2)`` prior to reduction.
         """
         self.ndims = dimensions
         self.mode = mode
         self.scale = scale
 
         if scale:
-            self.scaler = MinMaxScaler((-np.pi/2, np.pi/2)) # minimum value on the negative spectrum
+            self.scaler = MinMaxScaler(
+                (-np.pi / 2, np.pi / 2)
+            )  # minimum value on the negative spectrum
 
         if self.mode == "lda":
             self.kmeans = KMeans(n_clusters=self.ndims, random_state=0, n_init=10)
@@ -47,11 +55,17 @@ class Preprocessor:
 
     def fit_transform(self, features: pd.DataFrame):
         """
-        Trains the preprocessor so that the outcome can be
-        transformed afterwards.
+        Fit the preprocessor and transform the provided features.
 
-        Args:
-            features (DataFrame): Features DataFrame
+        Parameters
+        ----------
+        features : pandas.DataFrame
+            Input features to fit and transform.
+
+        Returns
+        -------
+        numpy.ndarray
+            Transformed feature matrix depending on chosen reduction mode.
         """
         output = features.copy()
         if self.scale:
@@ -66,12 +80,14 @@ class Preprocessor:
 
     def fit(self, features: pd.DataFrame, target: pd.DataFrame):
         """
-        Trains the preprocessor so that the outcome can be
-        transformed afterwards.
+        Fit the preprocessor to the provided features and (optionally) target.
 
-        Args:
-            features (DataFrame): Features DataFrame
-            target (DataFrame): Target to balance the features
+        Parameters
+        ----------
+        features : pandas.DataFrame
+            Feature table used to fit the internal models (e.g., PCA or LDA).
+        target : pandas.DataFrame
+            Target used when computing correlations for LDA-based grouping.
         """
         output = features.copy()
         if self.scale:
@@ -100,14 +116,19 @@ class Preprocessor:
 
     def transform(self, features: pd.DataFrame, target: pd.DataFrame = None):
         """
-        Transforms the original features into the LDA based dimensions
+        Transform features using the fitted preprocessor.
 
-        Args:
-            features (pd.DataFrame): Original feature set to be transformed
-            target (pd.DataFrame): Target distribution, required to compute the correlation
+        Parameters
+        ----------
+        features : pandas.DataFrame
+            Original feature set to be transformed.
+        target : pandas.DataFrame, optional
+            Target distribution required when using ``lda`` mode.
 
-        Returns:
-            np.array: Numpy array that contains the reduced dataset
+        Returns
+        -------
+        numpy.ndarray
+            Reduced feature matrix.
         """
         output = features.copy()
         if self.scale:

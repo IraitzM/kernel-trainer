@@ -1,11 +1,52 @@
 import click
 from pathlib import Path
 
+
 class Union(click.ParamType):
+    """
+    ParamType that tries multiple click types in sequence and returns the first
+    successful conversion.
+
+    Parameters
+    ----------
+    types : sequence
+        Sequence of :class:`click.ParamType` instances to attempt.
+    """
+
     def __init__(self, types):
+        """
+        Construct the Union ParamType.
+
+        Parameters
+        ----------
+        types : sequence
+            Sequence of :class:`click.ParamType` instances to attempt during conversion.
+        """
         self.types = types
 
     def convert(self, value, param, ctx):
+        """
+        Attempt to convert ``value`` using each provided ParamType.
+
+        Parameters
+        ----------
+        value : str
+            Raw value to convert.
+        param : click.Parameter
+            Click parameter metadata.
+        ctx : click.Context
+            Click context.
+
+        Returns
+        -------
+        object
+            The converted and validated value from the first successful type.
+
+        Raises
+        ------
+        click.BadParameter
+            If none of the provided types successfully convert the value.
+        """
         for type_ in self.types:
             try:
                 return type_.convert(value, param, ctx)
@@ -13,11 +54,18 @@ class Union(click.ParamType):
                 continue
         self.fail(f"Didn't match any of the accepted types: {self.types}")
 
+
 dataset = click.option(
     "--dataset",
     envvar=None,
     help="Select a known dataset from scikit-learn or local CSV file",
-    type=Union([click.Path(resolve_path=True, exists=True, path_type=Path), click.Choice(["iris", "breast-cancer", "wine", "monk"])]),
+    type=Union(
+        [
+            click.Path(resolve_path=True, exists=True, path_type=Path),
+            click.Choice(["iris", "breast-cancer", "wine", "monk"
+                          "1a", "1b", "1c","2a", "2b", "2c","3a", "3b", "3c",]),
+        ]
+    ),
     default=None,
     prompt=True,
 )
@@ -52,7 +100,7 @@ backend = click.option(
     "--backend",
     envvar=None,
     help="Backend to be used",
-    default="qiskit",
+    default="pennylane",
     type=click.Choice(["qiskit", "pennylane"]),
 )
 
@@ -63,6 +111,15 @@ generations = click.option(
     default=2,
     type=click.INT,
 )
+
+seed = click.option(
+    "--seed",
+    envvar=None,
+    help="Random state",
+    default=42,
+    type=click.INT,
+)
+
 
 population = click.option(
     "--population",
@@ -113,6 +170,7 @@ out_path = click.option(
     default=None,  # "results/train",
 )
 
+# Mandatory out-path
 out_path_man = click.option(
     "--out-path",
     envvar=None,
@@ -131,11 +189,7 @@ dataset_id = click.option(
 )
 
 id = click.option(
-    "--id",
-    envvar=None,
-    help="Dataset ID",
-    default=None,
-    type=click.STRING
+    "--id", envvar=None, help="Dataset ID", default=None, type=click.STRING
 )
 
 

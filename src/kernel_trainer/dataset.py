@@ -8,11 +8,27 @@ import pandas as pd
 
 
 class DataGenerator:
-    """_summary_"""
+    """
+    Synthetic 3D dataset generator used for benchmarks and examples.
+
+    The generator supports several pre-defined dataset templates (IDs such as
+    ``'1a'``, ``'2c'``, etc.) returned as a :class:`pandas.DataFrame` with three
+    feature columns and a ``'y'`` target column.
+    """
 
     def __init__(
         self, samples: int = 100, imbalance_ratio: float = 0.5, seed: int = 4321
     ):
+        """
+        Parameters
+        ----------
+        samples : int, optional
+            Number of total samples to generate (default 100).
+        imbalance_ratio : float, optional
+            Ratio of class proportions for binary datasets (default 0.5).
+        seed : int, optional
+            RNG seed for reproducibility (default 4321).
+        """
         random.seed(seed)
 
         self.seed = seed
@@ -21,17 +37,21 @@ class DataGenerator:
 
     def _ellipsoid(self, center, rx, ry, rz, nmax):
         """
-        Generate random points inside a 3D ellipsoid.
+        Generate random points uniformly inside a 3D ellipsoid.
 
-        Args:
-            center (list): Center location of the ellipsoid [x,y,z]
-            rx (float): Radius of the ellipsoid in x-axis
-            ry (float): Radius of the ellipsoid in y-axis
-            rz (float): Radius of the ellipsoid in z-axis
-            nmax (int): Total number of data points to generate
+        Parameters
+        ----------
+        center : sequence of float
+            Center coordinates ``[x, y, z]`` of the ellipsoid.
+        rx, ry, rz : float
+            Radii along the x, y, and z axes.
+        nmax : int
+            Number of points to generate.
 
-        Returns:
-            numpy.ndarray: Array of generated points [[x1,y1,z1],[x2,y2,z2]....[xn,yn,zn]]
+        Returns
+        -------
+        numpy.ndarray
+            Array of shape ``(nmax, 3)`` containing generated points in Cartesian coordinates.
         """
         x3 = []
         y3 = []
@@ -52,10 +72,17 @@ class DataGenerator:
 
     def generate_dataset(self, dataset_id: str):
         """
-        Creates the dataset according to provided ID.
+        Create a synthetic dataset according to the provided template ID.
 
-        Args:
-            dataset_id (str): Dataset ID
+        Parameters
+        ----------
+        dataset_id : str
+            Identifier of the template dataset (e.g., '1a', '2c', etc.).
+
+        Returns
+        -------
+        pandas.DataFrame
+            DataFrame with three feature columns and a target column ``'y'``.
         """
         match dataset_id:
             case "0":

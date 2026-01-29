@@ -23,6 +23,7 @@ dependencies = [
     "matplotlib>=3.10.5",
     "python-dotenv>=1.2.1",
     "pandas>=2.2.3",
+    "rich-tools>=0.6.0",
 ]
 requires-python = ">=3.11"
 readme = "README.md"
@@ -39,6 +40,11 @@ distribution = true
 ktrainer = "kernel_trainer.cli:cli"
 
 [dependency-groups]
+dev = [
+    "pre-commit>=4.5.1",
+    "ruff>=0.14.14",
+    "skylos>=3.1.2",
+]
 notebooks = [
     "seaborn>=0.13.2",
     "ucimlrepo>=0.0.7",

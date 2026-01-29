@@ -13,6 +13,14 @@ tasks:
     cmds:
       - uv run ktrainer generate --out-path data --dataset-id {{.DATASET_ID}} {{.CLI_ARGS}}
 
+  benchmark:
+    cmds:
+      - uv run ktrainer benchmark {{.CLI_ARGS}}
+
+  compact:
+    cmds:
+      - uv run ktrainer compact {{.CLI_ARGS}}
+
   # Sky
   launch:
     cmds:
@@ -27,3 +35,9 @@ tasks:
       JOB_ID: "{{index .MATCH 0}}"
     cmds:
       - uv run sky jobs logs {{.JOB_ID}}
+
+  cancel-job:*:
+    vars:
+      JOB_ID: "{{index .MATCH 0}}"
+    cmds:
+      - uv run sky jobs cancel {{.JOB_ID}}

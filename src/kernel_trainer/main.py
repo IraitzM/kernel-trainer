@@ -139,10 +139,7 @@ def kernel_generator(
 
     # Evaluate the individuals with an invalid fitness
     valid_ind = [ind for ind in population if not ind.fitness.valid]
-    fitnesses = toolbox.map(
-        toolbox.evaluate,
-        valid_ind
-    )
+    fitnesses = toolbox.map(toolbox.evaluate, valid_ind)
     for ind, fit in zip(valid_ind, fitnesses):
         ind.fitness.values = fit
 

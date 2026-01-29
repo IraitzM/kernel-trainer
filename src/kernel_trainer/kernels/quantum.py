@@ -1,9 +1,13 @@
 """
 Lists predefined kernel structures
 """
+
 import time
 import numpy as np
 import pennylane as qml
+
+from sklearn.svm import SVC
+from sklearn.metrics import roc_auc_score, f1_score
 
 from qiskit import QuantumCircuit
 from qiskit.primitives import StatevectorSampler as Sampler
@@ -37,17 +41,35 @@ def pennylane_pauli_kernel(
     reps: int = 1, paulis: list[str] = None, entanglement: str = "linear"
 ):
     """
-    Creates the kernel based on a feature embedding represented by the Pauli list.
+    Create a Pennylane Pauli-based feature-map kernel.
 
-    Args:
-        reps (int, optional): Number of repetitions. Defaults to 1.
-        paulis (list[str], optional): List of Pauli terms encoding the
-    feature map. Defaults to None.
-        entanglement (str, optional): Entanglement to be considered creating the
-    feature map. Defaults to "linear".
+    Parameters
+    ----------
+    reps : int, optional
+        Number of repetitions (default is 1).
+    paulis : list of str, optional
+        Pauli strings that define the feature map (e.g., 'Z', 'XX', 'ZY'). If
+        ``None`` the default is ``['Z']`` which applies single-qubit Z rotations.
+    entanglement : {'linear', 'pauli'}, optional
+        Entanglement pattern used for multi-qubit Pauli terms. ``'linear'``
+        applies two-body terms between adjacent qubits; ``'pauli'`` uses the
+        explicit Pauli words provided in ``paulis``.
 
-    Returns:
-        function: Function to be used as a quantum circuit evaluation
+    Returns
+    -------
+    callable
+        A kernel function ``f(x1, x2)`` that can be used inside a Pennylane
+        ``QNode`` and returns a probability vector or scalar depending on the
+        circuit measurement.
+
+    Notes
+    -----
+    This implements a Pauli-rotation feature embedding aligned with common
+    quantum-kernel constructions (see Havlíček et al., 2019).
+
+    References
+    ----------
+    Havlíček, V., et al., "Supervised learning with quantum-enhanced feature spaces", Nature (2019).
     """
     hadamard = False
     if not paulis:
@@ -55,6 +77,19 @@ def pennylane_pauli_kernel(
         paulis = ["Z"]
 
     def inner_func(x1, x2):
+        """Kernel evaluation function for two input vectors.
+
+        Parameters
+        ----------
+        x1, x2 : array-like
+            Input vectors representing features to be embedded into the
+            quantum circuit.
+
+        Returns
+        -------
+        numpy.ndarray
+            Probabilities or measurement outcomes resulting from the QNode.
+        """
         n_qubits = len(x1)
 
         projector = np.zeros((2**n_qubits, 2**n_qubits))
@@ -113,16 +148,30 @@ def qiskit_pauli_kernel(
     dims: int, reps: int = 1, paulis: list[str] = None, trainable_block: list = None
 ):
     """
-    Creates the kernel based on a feature embedding represented by the Pauli list.
+    Build a Qiskit quantum kernel using a Pauli feature map.
 
-    Args:
-        dims (int): Dimensions of the entry data
-        reps (int, optional): Number of repetitions. Defaults to 1.
-        paulis (list[str], optional): List of Pauli terms encoding the
-    feature map. Defaults to None.
+    Parameters
+    ----------
+    dims : int
+        Input dimensionality (number of classical features to encode).
+    reps : int, optional
+        Number of repeated layers in the feature map (default 1).
+    paulis : list of str, optional
+        List of Pauli words used to construct the feature map. If ``None`` a
+        standard ``ZFeatureMap`` is used.
+    trainable_block : list, optional
+        If provided, a list of trainable gate labels to insert as additional
+        parameterised layers.
 
-    Returns:
-        function: Function to be used as a quantum circuit evaluation
+    Returns
+    -------
+    qiskit_machine_learning.kernels.FidelityQuantumKernel or TrainableFidelityQuantumKernel
+        Instantiated Qiskit kernel object ready to evaluate kernel matrices.
+
+    Notes
+    -----
+    The returned kernel is compatible with Qiskit's kernel evaluation methods
+    (``evaluate``) and can be used in kernel-based classifiers.
     """
     if not paulis:
         feature_map = ZFeatureMap(feature_dimension=dims, reps=reps)
@@ -225,15 +274,35 @@ def qiskit_pauli_kernel(
 
 def compute_kernel_matrix(kernel_func):
     """
-    Compute the matrix whose entries are the kernel
-    evaluated on pairwise data from sets A and B.
+    Return a function that computes the pairwise kernel matrix using ``kernel_func``.
+
+    Parameters
+    ----------
+    kernel_func : callable
+        Kernel function of two inputs ``f(x, y)`` that returns a scalar
+        similarity value or array-like result.
+
+    Returns
+    -------
+    callable
+        ``kernel_matrix(A, B)`` which computes ``f(a, b)`` for all ``a`` in ``A``
+        and ``b`` in ``B`` and returns a :class:`numpy.ndarray` with shape
+        ``(len(A), len(B))``.
     """
 
     def kernel_matrix(A, B):
         """
-        Returns the array of a NxN matrix
-        filled with results from the Kernel
-        function.
+        Compute the kernel Gram matrix between sets A and B.
+
+        Parameters
+        ----------
+        A, B : array-like
+            Collections of input vectors.
+
+        Returns
+        -------
+        numpy.ndarray
+            Kernel Gram matrix of shape ``(len(A), len(B))``.
         """
         rows = Parallel(n_jobs=-1, verbose=10)(
             delayed(kernel_func)(a, np.transpose(B)) for a in A
@@ -246,10 +315,21 @@ def compute_kernel_matrix(kernel_func):
 
 def circuit_evals_kernel(n_data, split):
     """
-    Compute how many circuit evaluations one needs for kernel-based
-    training and prediction.
-    """
+    Compute the number of quantum circuit evaluations required for training
+    and prediction given a dataset split.
 
+    Parameters
+    ----------
+    n_data : int
+        Total number of samples in the dataset.
+    split : float
+        Fraction of data used for training (0 < split < 1).
+
+    Returns
+    -------
+    int
+        Total number of circuit evaluations required (training + prediction).
+    """
     M = int(np.ceil(split * n_data))
     Mpred = n_data - M
 
@@ -260,16 +340,22 @@ def circuit_evals_kernel(n_data, split):
 
 
 def ind_to_pennylane_kernel(individual: np.ndarray, dev: qml.devices.LegacyDevice):
-    """Crates a kernel out of an individual
-
-    Args:
-        individual (np.ndarray): Numpy array describing the individual
-        dev (qml.devices.LegacyDevice): Pennylane device
-
-    Returns:
-        QNode: Pennylane qnode to execute the quantum kernel function
     """
+    Convert an encoded individual into a Pennylane QNode kernel.
 
+    Parameters
+    ----------
+    individual : numpy.ndarray
+        Integer-encoded description of the feature-map individual.
+    dev : pennylane.devices.LegacyDevice
+        PennyLane device on which the QNode will be executed.
+
+    Returns
+    -------
+    qml.QNode
+        A PennyLane QNode that evaluates the kernel for two inputs ``x1`` and
+        ``x2`` and returns the measured probabilities or fidelity-related value.
+    """
     replacements = {0: "I", 1: "X", 2: "Z", 3: "Y"}
     replacer = replacements.get  # For faster gets.
 
@@ -290,14 +376,22 @@ def ind_to_pennylane_kernel(individual: np.ndarray, dev: qml.devices.LegacyDevic
 def ind_to_qiskit_kernel(
     individual: np.ndarray, qc: QuantumCircuit, trainable_block: list = None
 ):
-    """Crates a kernel out of an individual
+    """
+    Convert an encoded individual into a Qiskit quantum kernel object.
 
-    Args:
-        individual (np.ndarray): Numpy array describing the individual
-        qc (QuantumCircuit) : Qiskit Quantum circuit
+    Parameters
+    ----------
+    individual : numpy.ndarray
+        Integer-encoded description of the feature-map individual.
+    qc : qiskit.QuantumCircuit
+        QuantumCircuit instance used as a template for the feature map.
+    trainable_block : list, optional
+        Optional list of trainable gate labels to insert in the feature map.
 
-    Returns:
-        Quantum Kernel: Pennylane qnode to execute the quantum kernel function
+    Returns
+    -------
+    qiskit_machine_learning.kernels.FidelityQuantumKernel
+        Instantiated Qiskit kernel ready to evaluate precomputed kernel matrices.
     """
     replacements = {0: "I", 1: "X", 2: "Z", 3: "Y"}
     replacer = replacements.get  # For faster gets.
@@ -319,7 +413,22 @@ def ind_to_qiskit_kernel(
 
 def get_stats(individual, num_qubits):
     """
-    Gets some key statistics for a feature map individual
+    Compute quick diagnostics for a given feature-map individual.
+
+    Parameters
+    ----------
+    individual : array-like
+        Encoded individual describing the feature map.
+    num_qubits : int
+        Number of qubits (i.e., input dimensionality) to build the circuit.
+
+    Returns
+    -------
+    tuple
+        ``(depth, expressivity, entangling_capacity)`` where ``depth`` is the
+        circuit depth, ``expressivity`` is a numeric score estimated by the
+        ``Expressivity`` metric, and ``entangling_capacity`` is the
+        entanglement capacity estimate.
     """
     qc = QuantumCircuit(num_qubits)
 
@@ -347,15 +456,38 @@ def evaluation_function(
     metric: str = "KTA",
     penalize_complexity: bool = False,
 ):
-    """Creates the evaluator function
-
-    Args:
-        individual (np.ndarray): Selected feature map individual
-        X (np.ndarray): _description_
-        y (np.ndarray): _description_
-        per_class (int, optional): _description_. Defaults to 10.
     """
-    # Fitness score, default 0
+    Evaluate a feature-map individual using a proxy metric.
+
+    Parameters
+    ----------
+    individual : array-like
+        Encoded feature map individual (integer array). A zero-coded individual
+        is considered a no-op and returns a zero fitness tuple.
+    X : numpy.ndarray
+        Feature matrix of shape ``(n_samples, n_features)``.
+    y : numpy.ndarray
+        Target labels corresponding to ``X``.
+    backend : {'pennylane', 'qiskit'}, optional
+        Backend used to build and evaluate the kernel (default 'pennylane').
+    metric : {'KTA', 'CKA'}, optional
+        Proxy metric to use for scoring: Kernel Target Alignment (KTA) or
+        Centered Kernel Alignment (CKA).
+    penalize_complexity : bool, optional
+        If True, penalize solutions with larger circuit depth or more
+        non-local gates.
+
+    Returns
+    -------
+    tuple
+        A 1-tuple containing the (minimization) fitness score: ``(fitness,)``.
+
+    Notes
+    -----
+    The function computes the proxy metric using the selected backend and
+    optionally penalises complex circuits by multiplying by depth and number
+    of non-local gates.
+    """  # Fitness score, default 0
     fit_score = 0
 
     # No operation
@@ -366,16 +498,26 @@ def evaluation_function(
         start_time = time.time()
         proc = psutil.Process(os.getpid())
         ram_used = proc.memory_info().rss / (1024 * 1024)
-        logger.debug(f"Creating individual in process {proc.pid} (MEM: {round(ram_used, 2)} MB)")
+        logger.debug(
+            f"Creating individual in process {proc.pid} (MEM: {round(ram_used, 2)} MB)"
+        )
         device = qml.device("qulacs.simulator", wires=X.shape[1])  # lightning.gpu
         kernel = ind_to_pennylane_kernel(individual, device)
 
         if metric == "KTA":
-            logger.debug(f"Going for KTA proxy metric {proc.pid} (MEM: {round(ram_used, 2)} MB)")
-            fit_score = qml.kernels.target_alignment(X, y, lambda x1, x2: kernel(x1, x2)[0])
+            logger.debug(
+                f"Going for KTA proxy metric {proc.pid} (MEM: {round(ram_used, 2)} MB)"
+            )
+            fit_score = qml.kernels.target_alignment(
+                X, y, lambda x1, x2: kernel(x1, x2)[0]
+            )
         else:
-            logger.debug(f"Going for CKA proxy metric {proc.pid} (MEM: {round(ram_used, 2)} MB)")
-            fit_score = pennylane_centered_kernel_alignment(X, y, kernel)
+            logger.debug(
+                f"Going for CKA proxy metric {proc.pid} (MEM: {round(ram_used, 2)} MB)"
+            )
+            fit_score = pennylane_centered_kernel_alignment(
+                X, y, lambda x1, x2: kernel(x1, x2)[0], logger=logger
+            )
 
         if penalize_complexity:
             specs = qml.specs(qnode=kernel)(X[0], X[0])
@@ -389,7 +531,9 @@ def evaluation_function(
         ram_used = proc.memory_info().rss / (1024 * 1024)
         logger.debug(f"Finishing {proc.pid} (MEM: {round(ram_used, 2)} MB)")
         timediff = time.time() - start_time
-        logger.debug(f"Proxy calculation on {proc.pid} took {timediff} (proc. time {time.process_time()})")
+        logger.debug(
+            f"Proxy calculation on {proc.pid} took {timediff} (proc. time {time.process_time()})"
+        )
 
     elif backend == "qiskit":
         start_time = time.time()
@@ -398,7 +542,9 @@ def evaluation_function(
         # Do some hard computing on the individual
         proc = psutil.Process(os.getpid())
         ram_used = proc.memory_info().rss / (1024 * 1024)
-        logger.debug(f"Creating individual in process {proc.pid} (MEM: {round(ram_used, 2)} MB)")
+        logger.debug(
+            f"Creating individual in process {proc.pid} (MEM: {round(ram_used, 2)} MB)"
+        )
         kernel = ind_to_qiskit_kernel(individual, qc)
 
         # Mask that fixes qiskit's idle qubit removal
@@ -407,11 +553,15 @@ def evaluation_function(
 
         try:
             ram_used = proc.memory_info().rss / (1024 * 1024)
-            logger.debug(f"Going for the proxy metric {proc.pid} (MEM: {round(ram_used, 2)} MB)")
+            logger.debug(
+                f"Going for the proxy metric {proc.pid} (MEM: {round(ram_used, 2)} MB)"
+            )
             if metric == "KTA":
                 fit_score = qiskit_target_alignment(kernel, X[:, mask], y, logger)
             else:
-                fit_score = qiskit_centered_target_alignment(kernel, X[:, mask], y, logger)
+                fit_score = qiskit_centered_target_alignment(
+                    kernel, X[:, mask], y, logger
+                )
 
             # Penalization if circuit is deep
             if penalize_complexity:
@@ -422,7 +572,9 @@ def evaluation_function(
             ram_used = proc.memory_info().rss / (1024 * 1024)
             logger.debug(f"Finishing {proc.pid} (MEM: {round(ram_used, 2)} MB)")
             timediff = time.time() - start_time
-            logger.debug(f"Proxy calculation on {proc.pid} took {timediff} (proc. time {time.process_time()})")
+            logger.debug(
+                f"Proxy calculation on {proc.pid} took {timediff} (proc. time {time.process_time()})"
+            )
         except Exception as e:
             # Some individuals raise issues when building the target alignment
             logger.error(f"{individual}: {e}")
@@ -431,18 +583,57 @@ def evaluation_function(
 
 
 def get_matrices(X_train, X_test, y_train, fm: str = "Z"):
+    """
+    Build kernel matrices for QSVC evaluation using the selected feature map.
+
+    Parameters
+    ----------
+    X_train : numpy.ndarray
+        Training features of shape ``(n_train, n_features)``.
+    X_test : numpy.ndarray
+        Test features of shape ``(n_test, n_features)``.
+    y_train : numpy.ndarray
+        Training labels used to compute alignment metrics.
+    fm : str, optional
+        Feature-map identifier string (e.g., ``'Z'``, ``'ZZ-linear'``, or a
+        Pauli string), by default ``'Z'``.
+
+    Returns
+    -------
+    tuple
+        ``(matrix_train, matrix_test, cka)`` where matrices are precomputed
+        kernel Gram matrices and ``cka`` is the centered kernel alignment
+        score on the training set.
+    """  # Num features
     num_dim = X_train.shape[1]
+    kernel = None
 
     if fm == "Z":
         kernel = qiskit_pauli_kernel(dims=num_dim, paulis=None)
-    elif fm == "ZZ":
+    elif fm.startswith("ZZ"):
         from qiskit.circuit.library import ZZFeatureMap
+
+        _, entanglement = fm.split("-")
 
         sampler = Sampler()
         fidelity = ComputeUncompute(sampler=sampler)
 
         # Instantiate quantum kernel
-        feature_map = ZZFeatureMap(num_dim, reps=1)
+        feature_map = ZZFeatureMap(num_dim, reps=1, entanglement=entanglement)
+        kernel = FidelityQuantumKernel(fidelity=fidelity, feature_map=feature_map)
+    else:
+        from qiskit.circuit.library import PauliFeatureMap
+
+        sampler = Sampler()
+        fidelity = ComputeUncompute(sampler=sampler)
+
+        if "-" in fm:
+            pauli, entanglement = fm.split("-")
+            feature_map = PauliFeatureMap(
+                num_dim, reps=1, paulis=[pauli], entanglement=entanglement
+            )
+        else:
+            feature_map = PauliFeatureMap(num_dim, reps=1, paulis=[fm])
         kernel = FidelityQuantumKernel(fidelity=fidelity, feature_map=feature_map)
 
     cka = qiskit_centered_target_alignment(kernel, X_train, y_train)
@@ -453,15 +644,84 @@ def get_matrices(X_train, X_test, y_train, fm: str = "Z"):
     return matrix_train, matrix_test, cka
 
 
-def get_matrices_ind(X_train, X_test, y_train, ind: list):
+def get_scores_ind(
+    X_train, X_test, y_train, y_test, ind: list, backend: str = "qiskit", seed: int = 42
+):
+    """
+    Evaluate a given individual by computing train/test kernel matrices and
+    training a precomputed-kernel SVM.
+
+    Parameters
+    ----------
+    X_train, X_test : numpy.ndarray
+        Training and test feature matrices.
+    y_train, y_test : numpy.ndarray
+        Training and test labels.
+    ind : list
+        Encoded individual that defines the feature map.
+    backend : {'qiskit', 'pennylane'}, optional
+        Backend to use for kernel evaluation (default 'qiskit').
+    seed : int, optional
+        Random seed used when fitting the classifier (default 42).
+
+    Returns
+    -------
+    tuple
+        ``(roc_auc, f1score, cka)`` evaluated on the test set and training CKA.
+    """
     num_dim = X_train.shape[1]
-    qc = QuantumCircuit(num_dim)
 
-    kernel = ind_to_qiskit_kernel(individual=ind, qc=qc)
+    if backend == "qiskit":
+        # Create kernel
+        qc = QuantumCircuit(num_dim)
+        kernel = ind_to_qiskit_kernel(individual=ind, qc=qc)
 
-    cka = qiskit_centered_target_alignment(kernel, X_train, y_train)
+        # Eval circuit
+        cka = qiskit_centered_target_alignment(kernel, X_train, y_train)
 
-    matrix_train = kernel.evaluate(x_vec=X_train)
-    matrix_test = kernel.evaluate(x_vec=X_test, y_vec=X_train)
+        # Matrices
+        m_train = kernel.evaluate(x_vec=X_train)
+        m_test = kernel.evaluate(x_vec=X_test, y_vec=X_train)
+    else:
+        device = qml.device("qulacs.simulator", wires=X_train.shape[1])  # lightning.gpu
+        kernel = ind_to_pennylane_kernel(ind, device)
 
-    return matrix_train, matrix_test, cka
+        def pennylane_matrix_compute(A, B):
+            """
+            Compute kernel evaluations using a PennyLane QNode and return
+            the |0> probability for each pair.
+
+            Parameters
+            ----------
+            A, B : array-like
+                Input sets for which to compute the kernel matrix.
+
+            Returns
+            -------
+            numpy.ndarray
+                Precomputed kernel matrix with |0> probabilities.
+            """
+            if len(A.shape) == 2:
+                # Single vector
+                return np.array([[kernel(a, b)[0] for b in B] for a in A])
+            else:
+                # Matrix
+                return kernel(A, B)[0]
+
+        cka = pennylane_centered_kernel_alignment(
+            X_train, y_train, pennylane_matrix_compute
+        )
+
+        m_train = pennylane_matrix_compute(X_train, X_train)
+        m_test = pennylane_matrix_compute(X_test, X_train)
+
+    # Compute the model
+    model = SVC(kernel="precomputed", probability=True, random_state=seed)
+    model.fit(m_train, y_train)
+
+    # Get the metrics
+    y_pred = model.predict_proba(m_test)[:, 1]
+    roc_auc = roc_auc_score(y_true=y_test, y_score=y_pred)
+    f1score = f1_score(y_test, model.predict(m_test))
+
+    return roc_auc, f1score, cka

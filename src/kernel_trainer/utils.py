@@ -1,15 +1,24 @@
 """
 Utilities
 """
+
 import plotly.express as px
 
 
 def visualize_3d(data):
     """
-    Visualize the 3D distribution of points in an ellipsoid.
+    Create a 3D scatter plot of an ellipsoid dataset.
 
-    Args:
-        points
+    Parameters
+    ----------
+    data : pandas.DataFrame or array-like
+        Dataset containing columns ``x0``, ``x1``, ``x2`` and a target column
+        ``y`` which is used to colour the points.
+
+    Returns
+    -------
+    plotly.graph_objs._figure.Figure
+        Plotly figure object representing the 3D scatter plot.
     """
 
     # Scatter plot of generated points
