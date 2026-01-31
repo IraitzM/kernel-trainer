@@ -62,7 +62,7 @@ dataset = click.option(
     type=Union(
         [
             click.Path(resolve_path=True, exists=True, path_type=Path),
-            click.Choice(["iris", "breast-cancer", "wine", "monk"
+            click.Choice(["iris", "breast-cancer", "wine", "monk",
                           "1a", "1b", "1c","2a", "2b", "2c","3a", "3b", "3c",]),
         ]
     ),
@@ -225,14 +225,6 @@ imratio = click.option(
     default=0.5,
     type=click.FLOAT,
     prompt=True,
-)
-
-seed = click.option(
-    "--seed",
-    envvar=None,
-    help="Seed",
-    default=4321,
-    type=click.INT,
 )
 
 cache = click.option(

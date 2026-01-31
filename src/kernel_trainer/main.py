@@ -25,15 +25,21 @@ creator.create("Strategy", np.ndarray)
 
 def initRD(icls, scls, num_params):
     """
-    Initialize the population
+    Initialize a real-valued individual with strategy parameters.
 
-    Args:
-        icls (_type_): Individuals
-        scls (_type_): Strategy
-        num_params (_type_): _description_
+    Parameters
+    ----------
+    icls : callable
+        Individual class constructor.
+    scls : callable
+        Strategy class constructor.
+    num_params : int
+        Number of parameters for the individual/strategy vectors.
 
-    Returns:
-        _type_: _description_
+    Returns
+    -------
+    Individual
+        Instantiated individual with attached strategy.
     """
     ind = icls(np.random.uniform(low=-np.pi, high=np.pi, size=num_params))
     ind.strategy = scls(np.random.uniform(low=-np.pi, high=np.pi, size=num_params))
@@ -42,7 +48,21 @@ def initRD(icls, scls, num_params):
 
 def initES(icls, scls, size):
     """
-    Initialize the population
+    Initialize a discrete individual using encoded integers.
+
+    Parameters
+    ----------
+    icls : callable
+        Individual class constructor.
+    scls : callable
+        Strategy class constructor.
+    size : int
+        Length of the individual.
+
+    Returns
+    -------
+    Individual
+        Instantiated individual with attached strategy.
     """
     ind = icls(random.choice(range(4)) for _ in range(size))
     ind.strategy = scls(random.choice(range(4)) for _ in range(size))
@@ -51,7 +71,17 @@ def initES(icls, scls, size):
 
 def mutate(individual):
     """
-    Mutate individual
+    Discrete mutation operator: increment a random gene modulo 4.
+
+    Parameters
+    ----------
+    individual : array-like
+        Encoded individual to mutate.
+
+    Returns
+    -------
+    tuple
+        Single-element tuple containing the mutated individual.
     """
     idx = random.choice(range(len(individual)))
     individual[idx] = (individual[idx] + 1) % 4
@@ -61,7 +91,17 @@ def mutate(individual):
 
 def mutate_rnd(individual):
     """
-    Mutate individual
+    Gaussian mutation operator: add normal noise to a random gene.
+
+    Parameters
+    ----------
+    individual : array-like
+        Individual to mutate.
+
+    Returns
+    -------
+    tuple
+        Single-element tuple containing the mutated individual.
     """
     idx = random.choice(range(len(individual)))
     individual[idx] += np.random.normal(0, np.pi / 2)  # Modified mutation
@@ -84,22 +124,37 @@ def kernel_generator(
     tournament_size: int = 10,
 ):
     """
-    Iterated over a population of potential kernels checking
-    their fitness so that best individuals are obtained.
+    Evolutionary search to find promising feature-map individuals.
 
-    Args:
-        X (_type_): Sample data
-        y (_type_): Target label
-        backend (str) : Choice between qiskit and pennylane
-        metric (str) : Choice between KTA and CKA (only available for qiskit)
-        population (int, optional): _description_. Defaults to 1000.
-        chain_size (int, optional): _description_. Defaults to 10.
-        ngen (int, optional): _description_. Defaults to 50.
-        cxpb (float, optional): _description_. Defaults to 0.2.
-        mutpb (float, optional): _description_. Defaults to 0.1.
+    Parameters
+    ----------
+    X : array-like
+        Training features used for fitness evaluation.
+    y : array-like
+        Training labels.
+    backend : {'qiskit', 'pennylane'}, optional
+        Backend used to build kernels (default 'qiskit').
+    metric : {'KTA', 'CKA'}, optional
+        Proxy metric used for fitness evaluation.
+    num_pop : int, optional
+        Population size (default 1000).
+    chain_size : int, optional
+        Length of encoded feature map individuals (default 10).
+    ngen : int, optional
+        Number of generations (default 50).
+    cxpb, mutpb : float, optional
+        Crossover and mutation probabilities.
+    processes : int, optional
+        Number of parallel processes to use.
+    penalize_complexity : bool, optional
+        Penalize complex circuits in fitness scoring.
+    tournament_size : int, optional
+        Tournament selection size.
 
-    Returns:
-        _type_: _description_
+    Returns
+    -------
+    tuple
+        ``(population, logbook)`` with the final population and recorded statistics.
     """
 
     # Init toolbox
@@ -186,7 +241,18 @@ def kernel_generator(
 
 def create_all(size: int):
     """
-    Create all combiantions
+    Return all non-trivial combinations for discrete individuals.
+
+    Parameters
+    ----------
+    size : int
+        Length of the combinations to generate.
+
+    Returns
+    -------
+    list
+        List of tuples enumerating all combinations in ``{0,1,2,3}^size``
+        excluding the all-zero tuple.
     """
     return_list = list(product(range(4), repeat=size))
     return_list.remove((0,) * size)
@@ -203,23 +269,35 @@ def brute_force(
     processes: int = 1,
     penalize_complexity: bool = False,
 ):
-    """Iterate over all possible options
+    """
+    Brute-force evaluation over the full discrete search space.
 
-    Args:
-        X (_type_): _description_
-        y (_type_): _description_
-        backend (str, optional): _description_. Defaults to "qiskit".
-        metric (str, optional): _description_. Defaults to 'KTA'.
-        chain_size (int, optional): _description_. Defaults to 10.
-        processes (int, optional): _description_. Defaults to 1.
-        penalize_complexity (bool, optional): _description_. Defaults to False.
+    Parameters
+    ----------
+    X, y : array-like
+        Training data and labels used for evaluation.
+    backend : {'qiskit', 'pennylane'}, optional
+        Backend for kernel construction (default 'qiskit').
+    metric : {'KTA', 'CKA'}, optional
+        Proxy metric to evaluate candidate kernels.
+    chain_size : int, optional
+        Length of the feature-map encoding.
+    processes : int, optional
+        Number of parallel processes to use.
+    penalize_complexity : bool, optional
+        If True, penalise complex circuits in the score.
+
+    Returns
+    -------
+    tuple
+        ``(output, logbook)`` sorted by descending score.
     """
 
     toolbox = base.Toolbox()
     toolbox.register("population", create_all)
 
     # Distributed
-    pool = multiprocessing.Pool(processes=processes)
+    pool = Pool(processes=processes)
     toolbox.register("map", pool.map)
     toolbox.register(
         "evaluate",
