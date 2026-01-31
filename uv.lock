@@ -1928,7 +1928,6 @@ dependencies = [
     { name = "deap" },
     { name = "joblib" },
     { name = "loguru" },
-    { name = "matplotlib" },
     { name = "pandas" },
     { name = "pennylane" },
     { name = "pennylane-qulacs" },
@@ -1953,6 +1952,7 @@ dev = [
 notebooks = [
     { name = "ipykernel" },
     { name = "marimo" },
+    { name = "matplotlib" },
     { name = "nbformat" },
     { name = "plotly" },
     { name = "pylatexenc" },
@@ -1969,7 +1969,6 @@ requires-dist = [
     { name = "deap", specifier = ">=1.4.3" },
     { name = "joblib", specifier = ">=1.4.2" },
     { name = "loguru", specifier = ">=0.7.3" },
-    { name = "matplotlib", specifier = ">=3.10.5" },
     { name = "pandas", specifier = ">=2.2.3" },
     { name = "pennylane", specifier = ">=0.44.0" },
     { name = "pennylane-qulacs", specifier = ">=0.44.0" },
@@ -1994,6 +1993,7 @@ dev = [
 notebooks = [
     { name = "ipykernel", specifier = ">=6.29.5" },
     { name = "marimo", specifier = ">=0.18.4" },
+    { name = "matplotlib", specifier = ">=3.10.5" },
     { name = "nbformat", specifier = ">=5.10.4" },
     { name = "plotly", specifier = ">=6.1.2" },
     { name = "pylatexenc", specifier = ">=2.10" },
