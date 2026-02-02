@@ -372,8 +372,8 @@ def stats(**kwargs):
             str(round(entang, 6)),
         )
 
-    if "out_path" in kwargs:
-        outpath = kwargs.get("out_path")
+    outpath = kwargs.get("out_path", None)
+    if outpath:
         if not outpath.exists():
             outpath.mkdir()
 
