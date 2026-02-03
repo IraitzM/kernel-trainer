@@ -1,9 +1,11 @@
 resources:
   # Optional; if left out, automatically pick the cheapest cloud.
   infra: nebius
-  # 8x NVIDIA A100 GPU
+  # Main resources
   cpus: 16+
   memory: 32+
+  # GPU
+  # accelerators: A100:8
 
 # Working directory (optional) containing the project codebase.
 # Its contents are synced to ~/sky_workdir/ on the cluster.

@@ -354,4 +354,4 @@ class DataGenerator:
                 target = pd.DataFrame(y_1, columns=["y"])
                 return pd.concat([features, target], axis=1)
             case _:
-                return NotImplementedError
+                raise NotImplementedError(f"Unsupported dataset_id: {dataset_id}")

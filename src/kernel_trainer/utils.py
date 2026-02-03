@@ -138,4 +138,8 @@ def collect_results(path: str, metric:str, summarize:bool = True) -> pd.DataFram
     result_df = result_df.rename(columns=column_mapping)
 
     # Reorder columns
+    if result_df.empty:
+        return pd.DataFrame(columns=['Dataset', 'linear', 'poly', 'rbf', 'z', 'zy', 'zz-full', 'best'])
+
+    # else
     return result_df[['Dataset', 'linear', 'poly', 'rbf', 'z', 'zy', 'zz-full', 'best']]

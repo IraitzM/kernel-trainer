@@ -164,7 +164,7 @@ def train(**kwargs):
             raise NotImplementedError
         else:
             logger.error(f"Dataset {dataset} not found!")
-            raise Exception()
+            raise ValueError(f"Dataset '{dataset}' not found. Supported: iris, wine")
 
     # Extract params
     algo = kwargs.get("algorithm")
@@ -244,7 +244,6 @@ def generate(**kwargs):
     None
     """
     # Dimensions
-    num_dimensions = 3
     dataset_id = kwargs.get("dataset_id")
     samples = kwargs.get("samples")
     imbalance_ratio = kwargs.get("imb_ratio")
@@ -265,7 +264,7 @@ def generate(**kwargs):
         # Day precision
         timestamp = datetime.datetime.now().strftime("%Y-%m-%d")
         data.to_csv(
-            f"{outpath}/{dataset_id}_{num_dimensions}d_{samples}s_{imbalance_ratio}ir_{seed}_{timestamp}.csv",
+            f"{outpath}/{dataset_id}_3d_{samples}s_{imbalance_ratio}ir_{seed}_{timestamp}.csv",
             index=False,
         )
 
@@ -353,11 +352,26 @@ def stats(**kwargs):
         individual = None
         nqubits = 0
         for idx, exp in enumerate(data[k]):
-            if exp["log"][-1]["max"] > max_cka:
-                max_cka = exp["log"][-1]["max"]
+            # Guard: ensure log exists and is non-empty before indexing
+            log = exp.get("log")
+            if not log:
+                continue
+
+            # Safely read last log entry and its max value
+            last_entry = log[-1] if isinstance(log, list) else {}
+            max_val = last_entry.get("max", 0.0)
+
+            if max_val > max_cka:
+                max_cka = max_val
                 max_id = idx
-                individual = exp["population"][0]
-                nqubits = exp["kwargs"]["dims"]
+                population = exp.get("population") or []
+                individual = population[0] if population else None
+                nqubits = exp.get("kwargs", {}).get("dims", 0) or 0
+
+        # If no valid individual was found, skip this key
+        if individual is None or nqubits <= 0:
+            logger.warning(f"No valid experiments with non-empty logs found for key {k}; skipping.")
+            continue
 
         # Best run
         depth, expr, entang = get_stats(individual, nqubits)
@@ -506,6 +520,10 @@ def benchmark(**kwargs):
 
     # Load result file
     file_path = kwargs.get("file_path")
+    if not file_path or not file_path.is_dir():
+        logger.error(f"file_path must be an existing directory, got: {file_path}")
+        raise ValueError("Invalid file_path for benchmark results")
+
     for x in os.listdir(file_path):
         if x.endswith(".pkl") and x.startswith(dataset_id):
             full_path = os.path.join(file_path, x)
@@ -566,9 +584,9 @@ def benchmark(**kwargs):
     )
     table.add_row("best (pennylane)", str(roc_auc), str(f1score), str(cka))
     if cka < max_cka:
-        logger.warning(f"CKA in this execution is lower that the original max CKA: {cka} < {max_cka}")
+        logger.warning(f"CKA in this execution is lower than the original max CKA: {cka} < {max_cka}")
     elif cka > max_cka:
-        logger.warning(f"CKA in this execution is higher that the original max CKA: {cka} > {max_cka}")
+        logger.warning(f"CKA in this execution is higher than the original max CKA: {cka} > {max_cka}")
 
     out_path = kwargs.get("out_path", None)
     if out_path:
@@ -593,7 +611,7 @@ def benchmark(**kwargs):
 @p.out_path_man
 def compact(**kwargs):
     """
-    Compact results fro the benchmark
+    Compact results from the benchmark
 
     Parameters
     ----------

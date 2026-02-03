@@ -71,7 +71,7 @@ def qiskit_target_alignment(
     # Rescale
     nplus = np.count_nonzero(np.array(y) == 1)
     nminus = len(y) - nplus
-    _Y = np.array([y / nplus if y == 1 else y / nminus for y in y])
+    _Y = np.array([yi / nplus if yi == 1 else yi / nminus for yi in y])
 
     # Target matrix
     T = np.outer(_Y, _Y)
@@ -124,7 +124,7 @@ def qiskit_centered_target_alignment(
     # Rescale
     nplus = np.count_nonzero(np.array(y) == 1)
     nminus = len(y) - nplus
-    _Y = np.array([y / nplus if y == 1 else y / nminus for y in y])
+    _Y = np.array([yi / nplus if yi == 1 else yi / nminus for yi in y])
 
     # Create centering matrix H = I - (1/n) * 1 * 1^T
     H = np.eye(n) - (1 / n) * np.ones((n, n))
@@ -143,13 +143,13 @@ def qiskit_centered_target_alignment(
     norm_k = np.sqrt(np.sum(centered_kmatrix * centered_kmatrix))
     norm_t = np.sqrt(np.sum(centered_T * centered_T))
 
-    # Handle edge case where norms are zero
-    if norm_k == 0 or norm_t == 0:
-        return 0.0
-
     # Free resources
     del kmatrix
     gc.collect()
+
+    # Handle edge case where norms are zero
+    if norm_k == 0 or norm_t == 0:
+        return 0.0
 
     return inner_product / (norm_k * norm_t)
 
@@ -301,6 +301,8 @@ def pennylane_centered_kernel_alignment(
     hsic_LL = np.trace(L_centered @ L_centered) / ((n - 1) ** 2)
 
     # Compute CKA
+    if hsic_KK == 0 or hsic_LL == 0:
+        return 0.0
     cka = hsic_KL / np.sqrt(hsic_KK * hsic_LL)
 
     return cka
@@ -447,7 +449,14 @@ class Expressivity:
             self.fidelity, bins=self.bins_list, weights=self.weights, range=[0, 1]
         )[0]
 
-        return sum(rel_entr(pi_hist, self.p_haar_hist))
+        # Add small epsilon to avoid inf in KL divergence
+        eps = 1e-10
+        p_haar_smooth = np.array(self.p_haar_hist) + eps
+        p_haar_smooth /= p_haar_smooth.sum()
+        pi_hist_smooth = pi_hist + eps
+        pi_hist_smooth /= pi_hist_smooth.sum()
+
+        return sum(rel_entr(pi_hist_smooth, p_haar_smooth))
 
 
 class EntanglingCapacity:

@@ -18,8 +18,8 @@ try:
 except Exception as e:
     logger.error(e)
 
-creator.create("FitnessMin", base.Fitness, weights=(1.0,))  # Minimization
-creator.create("Individual", np.ndarray, fitness=creator.FitnessMin, strategy=None)
+creator.create("FitnessMax", base.Fitness, weights=(1.0,))  # Maximization
+creator.create("Individual", np.ndarray, fitness=creator.FitnessMax, strategy=None)
 creator.create("Strategy", np.ndarray)
 
 
@@ -236,6 +236,10 @@ def kernel_generator(
     # Order
     population.sort(key=lambda e: e.fitness, reverse=True)
 
+    # Close
+    pool.close()
+    pool.join()
+
     return population, logbook
 
 
@@ -335,5 +339,9 @@ def brute_force(
 
     # Sort output
     output = sorted(output.items(), key=lambda x: x[1], reverse=True)
+
+    # Close
+    pool.close()
+    pool.join()
 
     return output, logbook
