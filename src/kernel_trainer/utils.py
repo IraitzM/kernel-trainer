@@ -5,7 +5,7 @@ import os
 import pandas as pd
 import plotly.express as px
 
-from loguru import logger
+from kernel_trainer.config import logger
 
 def visualize_3d(data):
     """
