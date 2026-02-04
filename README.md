@@ -62,7 +62,7 @@ A stats summary table will appear at the end for a particular dataset and best f
 
 ## Task
 
-[Taskfile](https://taskfile.dev/) allows for simpler execution just by calling `task search`. Make sure you follow with `-- `and your arguments to pass them by.
+[Taskfile](https://taskfile.dev/) allows for simpler execution just by calling `task search`. Make sure you follow with `--`and your arguments to pass them by.
 
 ## Remote execution
 

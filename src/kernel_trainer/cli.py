@@ -295,8 +295,12 @@ def stats(**kwargs):
     if identity:
         data = {identity: []}
 
+        if file_path.is_file():
+            with open(file_path, "rb") as file:
+                tmp = pickle.load(file)
+            data[identity].append(tmp)
         # Directory
-        if file_path.is_dir():
+        elif file_path.is_dir():
             # List all files
             for x in os.listdir(file_path):
                 if x.endswith(".pkl") and identity in x:
@@ -321,7 +325,12 @@ def stats(**kwargs):
 
         # Directory
         if file_path.is_dir():
-            # List all files
+            dataset = file_path.name[:2]
+            if dataset in data:
+                with open(file_path, "rb") as file:
+                    tmp = pickle.load(file)
+                data[dataset].append(tmp)
+        elif file_path.is_dir():
             for x in os.listdir(file_path):
                 if x.endswith(".pkl"):
                     dataset = x[:2]  # First chars
