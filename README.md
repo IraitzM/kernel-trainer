@@ -47,7 +47,7 @@ ktrainer stats
 
 It shows a table with the statistics for expressivity, entanglement capacity and CKA for each dataset id within the ones created by `generate` command. If `--id` is also provided looks for the ones specific to that id.
 
-![](assets/stats.png)
+![Stats summary table](assets/stats.png)
 
 The benchmark subcommand, takes an individual dataset id from its original dataset file and compares the obtained best individual against classical and pre-fixed quantum kernels.
 ```py
@@ -58,7 +58,7 @@ ktrainer benchmark
 ```
 A stats summary table will appear at the end for a particular dataset and best found individual labeled as `best`.
 
-![](assets/benchmarkcli.png)
+![Benchmark CLI summary table](assets/benchmarkcli.png)
 
 ## Task
 
