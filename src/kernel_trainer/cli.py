@@ -1,10 +1,8 @@
 import os
-import sys
 import click
 import pickle
 import datetime
 import pandas as pd
-from loguru import logger
 from sklearn.model_selection import train_test_split
 
 import tqdm
@@ -13,6 +11,7 @@ from rich.table import Table
 from rich_tools import table_to_df
 
 import kernel_trainer.params as p
+from kernel_trainer.config import logger
 from kernel_trainer.main import brute_force, kernel_generator
 from kernel_trainer.kernels import (
     expsine2_kernel,
@@ -26,20 +25,6 @@ from kernel_trainer.dataset import DataGenerator
 
 from sklearn.svm import SVC
 from sklearn.metrics import roc_auc_score, f1_score
-
-from dotenv import load_dotenv, find_dotenv
-
-load_dotenv(find_dotenv(), override=True)
-
-# Logs
-logger.remove(0)
-logger.add(
-    sys.stdout,
-    colorize=True,
-    format="{time:YYYY-MM-DD at HH:mm:ss} | {level} | {message}",
-    level=os.getenv("LOG_LEVEL", "INFO"),
-)
-
 
 @click.group(
     context_settings={"help_option_names": ["-h", "--help"]},

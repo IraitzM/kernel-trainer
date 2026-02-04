@@ -3,17 +3,17 @@ import random
 import numpy as np
 from tqdm import tqdm
 
-from loguru import logger
 from itertools import product
 from deap import base, creator, tools, algorithms
 from multiprocessing import Pool
 
 from kernel_trainer.kernels import evaluation_function
+from kernel_trainer.config import logger
 
 # Erase any previous creator configuration
 try:
     del creator.Individual
-    del creator.FitnessMin
+    del creator.FitnessMax
     del creator.Strategy
 except Exception as e:
     logger.error(e)
