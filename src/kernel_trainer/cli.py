@@ -508,7 +508,7 @@ def benchmark(**kwargs):
             raise NotImplementedError
         else:
             logger.error(f"Dataset {dataset} not found!")
-            raise Exception()
+            raise ValueError(f"Dataset '{dataset}' not found. Supported: iris, wine")
 
     # Log
     logger.info(f"Dataset {dataset}")

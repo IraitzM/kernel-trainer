@@ -1,6 +1,6 @@
 ---
 agent: agent
 ---
-Make sure all functions have a Numpy docstring reflecting their current status and usage.
+Make sure all functions have a NumPy docstring reflecting their current status and usage.
 
 If possible, add references to the original paper mentioning the concept being implemented in the function.

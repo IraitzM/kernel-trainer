@@ -32,8 +32,8 @@ from loguru import logger
 from joblib import Parallel, delayed
 from deap import base, creator
 
-creator.create("FitnessMin", base.Fitness, weights=(1.0,))  # Minimization
-creator.create("Individual", np.ndarray, fitness=creator.FitnessMin, strategy=None)
+creator.create("FitnessMax", base.Fitness, weights=(1.0,))  # Maximization
+creator.create("Individual", np.ndarray, fitness=creator.FitnessMax, strategy=None)
 creator.create("Strategy", np.ndarray)
 
 
@@ -357,14 +357,17 @@ def ind_to_pennylane_kernel(individual: np.ndarray, dev: qml.devices.LegacyDevic
         ``x2`` and returns the measured probabilities or fidelity-related value.
     """
     replacements = {0: "I", 1: "X", 2: "Z", 3: "Y"}
-    replacer = replacements.get  # For faster gets.
+    def replacer(n):
+        if n not in replacements:
+            raise ValueError(f"Invalid encoding value: {n}. Expected 0-3.")
+        return replacements[n]
 
     # Substitute numbers by paulis
     pauli_strings = []
     for i in np.arange(0, len(individual), len(dev.wires)):
         section = individual[i : i + len(dev.wires)]
         if sum(section) > 0:
-            pauli_strings.append("".join([replacer(n, n) for n in section]))
+            pauli_strings.append("".join([replacer(n) for n in section]))
 
     # Kernel
     kernel_func = pennylane_pauli_kernel(paulis=pauli_strings, entanglement="pauli")
@@ -575,7 +578,7 @@ def evaluation_function(
             logger.debug(
                 f"Proxy calculation on {proc.pid} took {timediff} (proc. time {time.process_time()})"
             )
-        except Exception as e:
+        except (ValueError, RuntimeError) as e:
             # Some individuals raise issues when building the target alignment
             logger.error(f"{individual}: {e}")
 

@@ -178,9 +178,11 @@ def schmidt_decomp(qc: QuantumCircuit):
     state_array = state.data
 
     # Reshape the state vector into a matrix for the SVD
-    matrix = state_array.reshape(
-        qc.num_qubits, qc.num_qubits
-    )  # Reshape for a 2x2 matrix
+    # For bipartite split, divide qubits roughly in half
+    n = qc.num_qubits
+    n_a = n // 2
+    n_b = n - n_a
+    matrix = state_array.reshape(2**n_a, 2**n_b)
 
     # Perform SVD
     _, s, _ = np.linalg.svd(matrix)
@@ -403,6 +405,9 @@ class Expressivity:
 
         # Select the AerSimulator from the Aer provider
         simulator = AerSimulator(method="matrix_product_state")
+
+        # Copy circuit to avoid mutating the input
+        circuit = circuit.copy()
 
         # Remove measurements
         zero_state = "0" * nqubits

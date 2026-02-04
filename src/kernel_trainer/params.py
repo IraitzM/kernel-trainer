@@ -174,7 +174,7 @@ out_path = click.option(
 out_path_man = click.option(
     "--out-path",
     envvar=None,
-    help="Output folder/file",
+    help="Output folder/file (required)",
     type=click.Path(resolve_path=True, path_type=Path),
     prompt=True,
 )

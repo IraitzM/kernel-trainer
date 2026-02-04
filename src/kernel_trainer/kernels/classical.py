@@ -9,7 +9,7 @@ from sklearn.metrics import roc_auc_score
 
 
 # Sin kernel
-def sin_kernel(X, Y):
+def sin_kernel(X, Y=None):
     """
     Sine-based kernel that depends on pairwise Euclidean distance.
 
@@ -38,7 +38,7 @@ def sin_kernel(X, Y):
 
 
 # ExpSineSquared
-def expsine2_kernel(X, Y):
+def expsine2_kernel(X, Y=None):
     """
     Exponential-sine-squared kernel wrapper using scikit-learn's kernel.
 
@@ -117,8 +117,8 @@ class QuantumInspiredKernels:
         dot_products = np.dot(X, Y.T)
         sq_distances = np.sum((X[:, np.newaxis] - Y[np.newaxis, :]) ** 2, axis=2)
 
-        # Complex exponential with both real and imaginary parts
-        amplitude_part = np.exp(alpha * dot_products)
+        # Complex exponential with both real and imaginary parts, Clamp to avoid overflow
+        amplitude_part = np.exp(np.clip(alpha * dot_products, -700, 700))
         phase_part = np.exp(1j * beta * sq_distances)
 
         return np.real(amplitude_part * phase_part)
@@ -512,12 +512,8 @@ class HadamardRZKernels:
         for i in range(n_features):
             for j in range(i, n_features):
                 # Apply Hadamard to feature pair
-                X_pair = np.column_stack(
-                    [X[:, i], X[:, j] if j < n_features else X[:, i]]
-                )
-                Y_pair = np.column_stack(
-                    [Y[:, i], Y[:, j] if j < n_features else Y[:, i]]
-                )
+                X_pair = np.column_stack([X[:, i], X[:, j]])
+                Y_pair = np.column_stack([Y[:, i], Y[:, j]])
 
                 X_h = HadamardRZKernels._apply_hadamard_transform(X_pair, 0.7)
                 Y_h = HadamardRZKernels._apply_hadamard_transform(Y_pair, 0.7)
@@ -570,7 +566,7 @@ class QuantumInspiredSVM:
         K_train = self.kernel_func(self.X_train, **self.kernel_params)
 
         # Ensure kernel matrix is positive semi-definite
-        K_train = self._ensure_psd(K_train)
+        #K_train = self._ensure_psd(K_train)
 
         # Train SVM
         self.svm = SVC(kernel="precomputed", C=self.C, probability=True)
@@ -595,23 +591,23 @@ class QuantumInspiredSVM:
             raise ValueError("Model must be fitted first")
 
         K_test = self.kernel_func(X, self.X_train, **self.kernel_params)
-        K_test = self._ensure_psd(K_test)
+        #K_test = self._ensure_psd(K_test)
 
         return self.svm.predict(K_test)
 
     def score(self, X, y):
         """
-        ROC AUC Score
+        Compute ROC AUC Score using probability estimates.
         """
-        predictions = self.predict(X)
-        return roc_auc_score(y, predictions)
+        if self.svm is None:
+            raise ValueError("Model must be fitted first")
 
-    def _ensure_psd(self, K):
-        """Ensure kernel matrix is positive semi-definite"""
-        # Add small regularization to diagonal
-        if K.shape[0] == K.shape[1]:
-            K += 1e-8 * np.eye(K.shape[0])
-        return K
+        K_test = self.kernel_func(X, self.X_train, **self.kernel_params)
+        #K_test = self._ensure_psd(K_test)
+
+        # Use probability scores for proper ROC AUC
+        proba = self.svm.predict_proba(K_test)[:, 1]
+        return roc_auc_score(y, proba)
 
 
 class HadamardRZSVM:

@@ -5,7 +5,7 @@ version: '3'
 tasks:
   search:
     cmds:
-      - uv run ktrainer search --dims 3 --mode raw --algorithm evolutionary --metric CKA --mutpb 0.05 --cxpb 0.5 --out-path ./results/{{.DATASET_ID}} {{.CLI_ARGS}}
+      - uv run ktrainer search --dims 3 --mode raw --algorithm evolutionary --metric CKA --mutpb 0.05 --cxpb 0.5 {{.CLI_ARGS}}
 
   generate:*:
     vars:

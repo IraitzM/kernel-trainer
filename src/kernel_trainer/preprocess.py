@@ -50,7 +50,7 @@ class Preprocessor:
             self.model = PCA(n_components=self.ndims)
         elif self.mode == "tsne":
             self.model = TSNE(
-                n_components=self.ndims, perplexity=20, learning_rate=0.01
+                n_components=self.ndims, perplexity=20
             )
 
     def fit_transform(self, features: pd.DataFrame):
@@ -91,7 +91,11 @@ class Preprocessor:
         """
         output = features.copy()
         if self.scale:
-            output = self.scaler.fit_transform(output)
+            output = pd.DataFrame(
+                self.scaler.fit_transform(output),
+                columns=features.columns,
+                index=features.index
+            )
 
         if self.mode == "lda":
             # Calculate the correlation of each feature with the target variable
@@ -110,6 +114,8 @@ class Preprocessor:
 
             # Apply LDA to each group of features to create a new feature
             for i, group in enumerate(groups):
+                if len(group) == 0:
+                    raise ValueError(f"Cluster {i} has no features assigned; cannot fit LDA.")
                 self.lda[i].fit(output.iloc[:, group], target)
         elif self.mode == "pca":
             self.model.fit(output)
@@ -135,7 +141,7 @@ class Preprocessor:
             output = self.scaler.transform(output)
 
         if self.mode == "lda":
-            if not target:
+            if target is None:
                 raise Exception("You must provide a target when selecting LDA")
 
             # Calculate the correlation of each feature with the target variable
@@ -146,8 +152,7 @@ class Preprocessor:
             correlations_reshaped = np.reshape(correlations.values, (-1, 1))
 
             # Use existing KMeans
-            self.kmeans.predict(correlations_reshaped)
-            clusters = self.kmeans.labels_
+            clusters = self.kmeans.predict(correlations_reshaped)
 
             # Split the features into groups based on the cluster assignments
             groups = [np.where(clusters == i)[0] for i in range(self.ndims)]
