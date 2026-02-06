@@ -161,7 +161,7 @@ def train(**kwargs):
         logger.error(
             f"Dataset is {X_train.shape} but your chain-size is {chain_size}, try multiples of dataset width"
         )
-        raise Exception()
+        raise ValueError(f"Chain size {chain_size} must be a multiple of dataset width {X_train.shape[1]}")
 
     # Select algo
     if algo == "brute-force":
@@ -310,12 +310,6 @@ def stats(**kwargs):
 
         # Directory
         if file_path.is_dir():
-            dataset = file_path.name[:2]
-            if dataset in data:
-                with open(file_path, "rb") as file:
-                    tmp = pickle.load(file)
-                data[dataset].append(tmp)
-        elif file_path.is_dir():
             for x in os.listdir(file_path):
                 if x.endswith(".pkl"):
                     dataset = x[:2]  # First chars
@@ -325,6 +319,8 @@ def stats(**kwargs):
                             tmp = pickle.load(file)
 
                         data[dataset].append(tmp)
+        else:
+            raise ValueError("You need to provide and identity name or a folder containing synthetic dataset results")
 
     # Summary table
     table = Table(title="Stats summary")
