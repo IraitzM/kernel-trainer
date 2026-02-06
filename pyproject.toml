@@ -1,30 +1,32 @@
 [project]
 name = "kernel-trainer"
-version = "0.1.6"
+version = "0.1.8"
 description = "A library enabling the training process for feature map training."
 authors = [
     {name = "Iraitz", email = "iraitzm@gmail.com"},
 ]
 dependencies = [
     "scikit-learn>=1.5.1",
-    "pennylane>=0.36.0",
-    "deap>=1.4.1",
-    "qiskit>=1.1.1",
-    "qiskit-machine-learning>=0.7.2",
+    "deap>=1.4.3",
+    "qiskit>=2.2.0",
+    "qiskit-machine-learning>=0.9.0",
+    "qiskit-algorithms>=0.4.0",
+    "qiskit-aer>=0.17.2",
+    "qulacs>=0.6.12",
+    "pennylane>=0.44.0",
+    "pennylane-qulacs>=0.44.0",
     "joblib>=1.4.2",
     "loguru>=0.7.3",
     "click>=8.1.8",
-    "qiskit-algorithms>=0.3.1",
-    "qulacs>=0.6.11",
-    "pennylane-qulacs>=0.40.0",
     "tqdm>=4.67.1",
     "rich>=14.0.0",
-    "qiskit-aer>=0.17.1",
-    "matplotlib>=3.10.5",
+    "python-dotenv>=1.2.1",
+    "pandas>=2.2.3",
+    "rich-tools>=0.6.0",
 ]
 requires-python = ">=3.11"
 readme = "README.md"
-license = {text = " "}
+license = {text = "MIT"}
 
 [build-system]
 requires = ["pdm-backend"]
@@ -37,11 +39,27 @@ distribution = true
 ktrainer = "kernel_trainer.cli:cli"
 
 [dependency-groups]
+dev = [
+    "pre-commit>=4.5.1",
+    "ruff>=0.14.14",
+    "skylos>=3.1.2",
+]
 notebooks = [
     "seaborn>=0.13.2",
+    "matplotlib>=3.10.5",
     "ucimlrepo>=0.0.7",
     "ipykernel>=6.29.5",
     "pylatexenc>=2.10",
     "plotly>=6.1.2",
     "nbformat>=5.10.4",
+    "marimo>=0.18.4",
 ]
+remote = [
+    "skypilot[nebius]>=0.11.1",
+]
+
+[tool.marimo.runtime]
+auto_instantiate = false
+on_cell_change = "lazy"
+[tool.marimo.display]
+cell_output = "below"

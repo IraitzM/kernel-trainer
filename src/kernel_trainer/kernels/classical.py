@@ -5,13 +5,23 @@ Lists predefined classical kernel structures
 import numpy as np
 from sklearn.svm import SVC
 from sklearn.gaussian_process.kernels import ExpSineSquared
-from sklearn.metrics import accuracy_score, roc_auc_score
+from sklearn.metrics import roc_auc_score
 
 
 # Sin kernel
-def sin_kernel(X, Y):
+def sin_kernel(X, Y=None):
     """
-    Simple sine kernel: K(x,y) = amplitude * sin(frequency * ||x-y||)
+    Sine-based kernel that depends on pairwise Euclidean distance.
+
+    Parameters
+    ----------
+    X, Y : array-like
+        Input feature matrices. If ``Y`` is ``None`` ``X`` is used.
+
+    Returns
+    -------
+    numpy.ndarray
+        Kernel matrix with entries ``amplitude * sin(frequency * ||x-y||)``.
     """
 
     amplitude = 0.25
@@ -28,13 +38,19 @@ def sin_kernel(X, Y):
 
 
 # ExpSineSquared
-def expsine2_kernel(X, Y):
+def expsine2_kernel(X, Y=None):
     """
-    https://scikit-learn.org/stable/modules/gaussian_process.html#gp-kernels
+    Exponential-sine-squared kernel wrapper using scikit-learn's kernel.
 
-    Parameters:
-    * length: controls kernel function decay, low more sensitive, large smoother patterns
-    * periodicity: controles the period of the data
+    Parameters
+    ----------
+    X, Y : array-like
+        Input arrays. If ``Y`` is ``None`` then ``X`` is used for both.
+
+    Returns
+    -------
+    numpy.ndarray
+        Kernel matrix computed by an :class:`sklearn.gaussian_process.kernels.ExpSineSquared`.
     """
     kernel = ExpSineSquared(length_scale=0.25, periodicity=0.1)
     return kernel(X, Y)
@@ -48,8 +64,21 @@ class QuantumInspiredKernels:
     @staticmethod
     def rz_inspired_kernel(X, Y=None, rotation_scale=1.0, phase_shift=0.0):
         """
-        RZ-inspired kernel: K(x,y) = Re[exp(i * rotation_scale * <x,y> + phase_shift)]
-        Mimics the RZ gate's phase rotation behavior
+        RZ-inspired kernel mimicking phase rotations.
+
+        Parameters
+        ----------
+        X, Y : array-like
+            Input feature matrices. ``Y`` defaults to ``X`` when ``None``.
+        rotation_scale : float, optional
+            Scale applied to inner products.
+        phase_shift : float, optional
+            Global phase shift added to the exponent.
+
+        Returns
+        -------
+        numpy.ndarray
+            Real part of complex exponential ``exp(i * rotation_scale * <x,y> + phase_shift)``.
         """
         if Y is None:
             Y = X
@@ -66,8 +95,21 @@ class QuantumInspiredKernels:
     @staticmethod
     def complex_exponential_kernel(X, Y=None, alpha=1.0, beta=1.0):
         """
-        Complex exponential kernel: K(x,y) = Re[exp(alpha * <x,y>) * exp(i * beta * ||x-y||²)]
-        Combines amplitude and phase modulation
+        Complex-exponential kernel combining amplitude and phase modulation.
+
+        Parameters
+        ----------
+        X, Y : array-like
+            Input feature matrices. ``Y`` defaults to ``X`` when ``None``.
+        alpha : float, optional
+            Real amplitude scaling applied to inner products.
+        beta : float, optional
+            Phase factor applied to squared distances.
+
+        Returns
+        -------
+        numpy.ndarray
+            Real part of the combined complex exponential kernel.
         """
         if Y is None:
             Y = X
@@ -75,8 +117,8 @@ class QuantumInspiredKernels:
         dot_products = np.dot(X, Y.T)
         sq_distances = np.sum((X[:, np.newaxis] - Y[np.newaxis, :]) ** 2, axis=2)
 
-        # Complex exponential with both real and imaginary parts
-        amplitude_part = np.exp(alpha * dot_products)
+        # Complex exponential with both real and imaginary parts, Clamp to avoid overflow
+        amplitude_part = np.exp(np.clip(alpha * dot_products, -700, 700))
         phase_part = np.exp(1j * beta * sq_distances)
 
         return np.real(amplitude_part * phase_part)
@@ -84,8 +126,21 @@ class QuantumInspiredKernels:
     @staticmethod
     def trigonometric_feature_kernel(X, Y=None, freq_scale=1.0, phase_shifts=None):
         """
-        Trigonometric feature kernel: Explicit feature mapping with sin/cos
-        Maps each feature to [cos(freq*x), sin(freq*x)] then uses inner product
+        Trigonometric feature kernel using explicit sine/cosine features.
+
+        Parameters
+        ----------
+        X, Y : array-like
+            Input features. ``Y`` defaults to ``X`` when ``None``.
+        freq_scale : float, optional
+            Frequency scaling applied to features.
+        phase_shifts : array-like, optional
+            Per-feature phase shifts; defaults to zeros when ``None``.
+
+        Returns
+        -------
+        numpy.ndarray
+            Kernel matrix computed via an explicit trigonometric mapping and inner product.
         """
         if Y is None:
             Y = X
@@ -114,8 +169,19 @@ class QuantumInspiredKernels:
     @staticmethod
     def bloch_sphere_kernel(X, Y=None, theta_scale=1.0, phi_scale=1.0):
         """
-        Bloch sphere inspired kernel: Maps features to sphere coordinates
-        K(x,y) = cos(θ_x - θ_y) * cos(φ_x - φ_y)
+        Bloch-sphere inspired kernel mapping Cartesian features to spherical coordinates.
+
+        Parameters
+        ----------
+        X, Y : array-like
+            Input arrays; ``Y`` defaults to ``X`` if ``None``.
+        theta_scale, phi_scale : float, optional
+            Scaling factors for the spherical coordinate mappings.
+
+        Returns
+        -------
+        numpy.ndarray
+            Kernel matrix computed as product of cosine differences of angles.
         """
         if Y is None:
             Y = X
@@ -171,8 +237,19 @@ class QuantumInspiredKernels:
     @staticmethod
     def pauli_inspired_kernel(X, Y=None, pauli_scale=1.0):
         """
-        Pauli matrices inspired kernel
-        Mimics Pauli-X, Y, Z transformations
+        Pauli-inspired kernel combining Pauli-like feature transformations.
+
+        Parameters
+        ----------
+        X, Y : array-like
+            Input arrays (``Y`` defaults to ``X`` if ``None``).
+        pauli_scale : float, optional
+            Scale applied to phase-like contributions.
+
+        Returns
+        -------
+        numpy.ndarray
+            Composite kernel matrix combining linear and phase contributions.
         """
         if Y is None:
             Y = X
@@ -435,12 +512,8 @@ class HadamardRZKernels:
         for i in range(n_features):
             for j in range(i, n_features):
                 # Apply Hadamard to feature pair
-                X_pair = np.column_stack(
-                    [X[:, i], X[:, j] if j < n_features else X[:, i]]
-                )
-                Y_pair = np.column_stack(
-                    [Y[:, i], Y[:, j] if j < n_features else Y[:, i]]
-                )
+                X_pair = np.column_stack([X[:, i], X[:, j]])
+                Y_pair = np.column_stack([Y[:, i], Y[:, j]])
 
                 X_h = HadamardRZKernels._apply_hadamard_transform(X_pair, 0.7)
                 Y_h = HadamardRZKernels._apply_hadamard_transform(Y_pair, 0.7)
@@ -471,6 +544,21 @@ class QuantumInspiredSVM:
         self.X_train = None
 
     def fit(self, X, y):
+        """
+        Fit the QuantumInspiredSVM using a precomputed kernel matrix.
+
+        Parameters
+        ----------
+        X : array-like
+            Training feature matrix.
+        y : array-like
+            Training labels.
+
+        Returns
+        -------
+        self
+            Fitted estimator.
+        """
         # Scaled data
         self.X_train = X
 
@@ -478,7 +566,7 @@ class QuantumInspiredSVM:
         K_train = self.kernel_func(self.X_train, **self.kernel_params)
 
         # Ensure kernel matrix is positive semi-definite
-        K_train = self._ensure_psd(K_train)
+        #K_train = self._ensure_psd(K_train)
 
         # Train SVM
         self.svm = SVC(kernel="precomputed", C=self.C, probability=True)
@@ -486,27 +574,40 @@ class QuantumInspiredSVM:
         return self
 
     def predict(self, X):
+        """
+        Predict hard labels for provided data using the fitted SVM.
+
+        Parameters
+        ----------
+        X : array-like
+            Feature matrix to predict for.
+
+        Returns
+        -------
+        numpy.ndarray
+            Predicted class labels.
+        """
         if self.svm is None:
             raise ValueError("Model must be fitted first")
 
         K_test = self.kernel_func(X, self.X_train, **self.kernel_params)
-        K_test = self._ensure_psd(K_test)
+        #K_test = self._ensure_psd(K_test)
 
         return self.svm.predict(K_test)
 
     def score(self, X, y):
         """
-        ROC AUC Score
+        Compute ROC AUC Score using probability estimates.
         """
-        predictions = self.predict(X)
-        return roc_auc_score(y, predictions)
+        if self.svm is None:
+            raise ValueError("Model must be fitted first")
 
-    def _ensure_psd(self, K):
-        """Ensure kernel matrix is positive semi-definite"""
-        # Add small regularization to diagonal
-        if K.shape[0] == K.shape[1]:
-            K += 1e-8 * np.eye(K.shape[0])
-        return K
+        K_test = self.kernel_func(X, self.X_train, **self.kernel_params)
+        #K_test = self._ensure_psd(K_test)
+
+        # Use probability scores for proper ROC AUC
+        proba = self.svm.predict_proba(K_test)[:, 1]
+        return roc_auc_score(y, proba)
 
 
 class HadamardRZSVM:
@@ -520,6 +621,21 @@ class HadamardRZSVM:
         self.X_train = None
 
     def fit(self, X, y):
+        """
+        Fit the HadamardRZSVM using a precomputed kernel matrix.
+
+        Parameters
+        ----------
+        X : array-like
+            Training features.
+        y : array-like
+            Training labels.
+
+        Returns
+        -------
+        self
+            Fitted estimator.
+        """
         # Scale the data if needed
         X_scaled = X.copy()
 
@@ -537,6 +653,19 @@ class HadamardRZSVM:
         return self
 
     def predict(self, X):
+        """
+        Predict labels using the fitted HadamardRZSVM.
+
+        Parameters
+        ----------
+        X : array-like
+            Feature matrix for prediction.
+
+        Returns
+        -------
+        numpy.ndarray
+            Predicted class labels.
+        """
         if self.svm is None:
             raise ValueError("Model must be fitted first")
 
