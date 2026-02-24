@@ -49,9 +49,7 @@ class Preprocessor:
         elif self.mode == "pca":
             self.model = PCA(n_components=self.ndims)
         elif self.mode == "tsne":
-            self.model = TSNE(
-                n_components=self.ndims, perplexity=20
-            )
+            self.model = TSNE(n_components=self.ndims, perplexity=20)
 
     def fit_transform(self, features: pd.DataFrame):
         """
@@ -94,7 +92,7 @@ class Preprocessor:
             output = pd.DataFrame(
                 self.scaler.fit_transform(output),
                 columns=features.columns,
-                index=features.index
+                index=features.index,
             )
 
         if self.mode == "lda":
@@ -115,7 +113,9 @@ class Preprocessor:
             # Apply LDA to each group of features to create a new feature
             for i, group in enumerate(groups):
                 if len(group) == 0:
-                    raise ValueError(f"Cluster {i} has no features assigned; cannot fit LDA.")
+                    raise ValueError(
+                        f"Cluster {i} has no features assigned; cannot fit LDA."
+                    )
                 self.lda[i].fit(output.iloc[:, group], target)
         elif self.mode == "pca":
             self.model.fit(output)

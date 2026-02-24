@@ -26,6 +26,7 @@ from kernel_trainer.dataset import DataGenerator
 from sklearn.svm import SVC
 from sklearn.metrics import roc_auc_score, f1_score
 
+
 @click.group(
     context_settings={"help_option_names": ["-h", "--help"]},
     invoke_without_command=True,
@@ -54,6 +55,8 @@ def cli(ctx, **kwargs):
 @p.algo
 @p.backend
 @p.seed
+@p.checkpoint
+@p.checkpoint_frequency
 def train(**kwargs):
     """
     CLI command to search for optimal feature maps.
@@ -161,7 +164,13 @@ def train(**kwargs):
         logger.error(
             f"Dataset is {X_train.shape} but your chain-size is {chain_size}, try multiples of dataset width"
         )
-        raise ValueError(f"Chain size {chain_size} must be a multiple of dataset width {X_train.shape[1]}")
+        raise ValueError(
+            f"Chain size {chain_size} must be a multiple of dataset width {X_train.shape[1]}"
+        )
+
+    # Checkpointing
+    checkpoint_path = kwargs.get("checkpoint")
+    checkpoint_frequency = kwargs.get("checkpoint_frequency")
 
     # Select algo
     if algo == "brute-force":
@@ -188,6 +197,8 @@ def train(**kwargs):
             "processes": kwargs.get("processes"),
             "backend": kwargs.get("backend", "qiskit"),
             "metric": kwargs.get("metric", "CKA"),
+            "checkpoint_path": checkpoint_path,
+            "checkpoint_frequency": checkpoint_frequency,
         }
 
         pop_final, log = kernel_generator(**config)
@@ -206,6 +217,10 @@ def train(**kwargs):
         with open(f"{outpath}_{mode}_{num_dimensions}_{timestamp}.pkl", "wb") as file:
             pickle.dump(results, file)
 
+    # Erase checkpoint
+    if checkpoint_path and checkpoint_path.exists():
+        logger.info(f"Removing checkpoint {checkpoint_path}")
+        os.remove(checkpoint_path)
 
 @cli.command("generate")
 @p.out_path_man
@@ -320,7 +335,9 @@ def stats(**kwargs):
 
                         data[dataset].append(tmp)
         else:
-            raise ValueError("You need to provide and identity name or a folder containing synthetic dataset results")
+            raise ValueError(
+                "You need to provide and identity name or a folder containing synthetic dataset results"
+            )
 
     # Summary table
     table = Table(title="Stats summary")
@@ -360,7 +377,9 @@ def stats(**kwargs):
 
         # If no valid individual was found, skip this key
         if individual is None or nqubits <= 0:
-            logger.warning(f"No valid experiments with non-empty logs found for key {k}; skipping.")
+            logger.warning(
+                f"No valid experiments with non-empty logs found for key {k}; skipping."
+            )
             continue
 
         # Best run
@@ -574,9 +593,13 @@ def benchmark(**kwargs):
     )
     table.add_row("best (pennylane)", str(roc_auc), str(f1score), str(cka))
     if cka < max_cka:
-        logger.warning(f"CKA in this execution is lower than the original max CKA: {cka} < {max_cka}")
+        logger.warning(
+            f"CKA in this execution is lower than the original max CKA: {cka} < {max_cka}"
+        )
     elif cka > max_cka:
-        logger.warning(f"CKA in this execution is higher than the original max CKA: {cka} > {max_cka}")
+        logger.warning(
+            f"CKA in this execution is higher than the original max CKA: {cka} > {max_cka}"
+        )
 
     out_path = kwargs.get("out_path", None)
     if out_path:
@@ -595,6 +618,7 @@ def benchmark(**kwargs):
     else:
         console = Console()
         console.print(table)
+
 
 @cli.command("compact")
 @p.dataset
@@ -627,7 +651,9 @@ def compact(**kwargs):
             try:
                 df = pd.read_csv(csv_file)
                 dataframes.append(df)
-                logger.info(f"Loaded {csv_file}: {df.shape[0]} rows, {df.shape[1]} columns")
+                logger.info(
+                    f"Loaded {csv_file}: {df.shape[0]} rows, {df.shape[1]} columns"
+                )
             except Exception as e:
                 logger.error(f"Error loading {csv_file}: {e}")
                 continue
@@ -651,7 +677,7 @@ def compact(**kwargs):
         all_values = []
         for df in dataframes:
             # Convert to numeric, replacing '--' and other non-numeric values with NaN
-            values = pd.to_numeric(df[col], errors='coerce')
+            values = pd.to_numeric(df[col], errors="coerce")
             all_values.append(values)
 
         # Stack all values and compute mean (ignoring NaN)
@@ -660,7 +686,7 @@ def compact(**kwargs):
 
         # Update result dataframe
         # If all values were NaN, keep as '--', otherwise show the mean
-        result_df[col] = means.apply(lambda x: '--' if pd.isna(x) else f"{x:.6f}")
+        result_df[col] = means.apply(lambda x: "--" if pd.isna(x) else f"{x:.6f}")
 
     # Day precision
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d")
@@ -669,6 +695,7 @@ def compact(**kwargs):
     # Save to output file
     result_df.to_csv(output_file, index=False)
     logger.info(f"\nMean results saved to: {output_file}")
+
 
 # Support running as a module
 if __name__ == "__main__":
