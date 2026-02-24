@@ -566,7 +566,7 @@ class QuantumInspiredSVM:
         K_train = self.kernel_func(self.X_train, **self.kernel_params)
 
         # Ensure kernel matrix is positive semi-definite
-        #K_train = self._ensure_psd(K_train)
+        # K_train = self._ensure_psd(K_train)
 
         # Train SVM
         self.svm = SVC(kernel="precomputed", C=self.C, probability=True)
@@ -591,7 +591,7 @@ class QuantumInspiredSVM:
             raise ValueError("Model must be fitted first")
 
         K_test = self.kernel_func(X, self.X_train, **self.kernel_params)
-        #K_test = self._ensure_psd(K_test)
+        # K_test = self._ensure_psd(K_test)
 
         return self.svm.predict(K_test)
 
@@ -603,7 +603,7 @@ class QuantumInspiredSVM:
             raise ValueError("Model must be fitted first")
 
         K_test = self.kernel_func(X, self.X_train, **self.kernel_params)
-        #K_test = self._ensure_psd(K_test)
+        # K_test = self._ensure_psd(K_test)
 
         # Use probability scores for proper ROC AUC
         proba = self.svm.predict_proba(K_test)[:, 1]

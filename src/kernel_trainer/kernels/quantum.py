@@ -357,6 +357,7 @@ def ind_to_pennylane_kernel(individual: np.ndarray, dev: qml.devices.LegacyDevic
         ``x2`` and returns the measured probabilities or fidelity-related value.
     """
     replacements = {0: "I", 1: "X", 2: "Z", 3: "Y"}
+
     def replacer(n):
         if n not in replacements:
             raise ValueError(f"Invalid encoding value: {n}. Expected 0-3.")
