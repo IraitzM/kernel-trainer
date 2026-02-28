@@ -207,6 +207,14 @@ id = click.option(
     "--id", envvar=None, help="Dataset ID", default=None, type=click.STRING
 )
 
+overlap = click.option(
+    "--overlap",
+    envvar=None,
+    help="Amount of overlap between synthetic ellipsoids (0=none, 1=full)",
+    default=0.0,
+    type=click.FloatRange(0.0, 1.0),
+)
+
 
 metric = click.option(
     "--metric",

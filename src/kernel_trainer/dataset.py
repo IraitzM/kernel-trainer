@@ -70,20 +70,81 @@ class DataGenerator:
 
         return np.transpose([x3, y3, z3])
 
-    def generate_dataset(self, dataset_id: str):
+    def _checkerboard_centres(self, grid_size: int, radius: float, overlap: float):
+        """
+        Compute evenly-spaced centres for a square checkerboard layout.
+
+        Parameters
+        ----------
+        grid_size : int
+            Number of points along each axis (4 for a 4x4 grid).
+        radius : float
+            Ellipsoid radius used when constructing the linear spacing; the
+            returned coordinates will always lie in ``[radius, 1-radius]``.
+        overlap : float
+            Value in ``[0,1]``.  When ``0`` the centres are placed at
+            ``linspace(radius, 1-radius)``; when ``1`` all values collapse to
+            ``0.5``.  Intermediate values slide the points toward the cube
+            centre to increase mutual overlap.
+
+        Returns
+        -------
+        centres : numpy.ndarray, shape (grid_size**2, 3)
+            Cartesian coordinates of the centres in row-major order.
+        labels : numpy.ndarray, shape (grid_size**2,)
+            Checkerboard pattern of 0/1 labels; ``(i+j)%2 == 0`` yields a
+            ``1``.
+        """
+        # clamp overlap and guard against misuse
+        if overlap < 0:
+            overlap = 0.0
+        elif overlap > 1:
+            overlap = 1.0
+
+        base = np.linspace(radius, 1 - radius, grid_size)
+        centre_point = 0.5
+        adjusted = centre_point + (base - centre_point) * (1 - overlap)
+
+        centres = []
+        labels = []
+        for iy, y in enumerate(adjusted):
+            for ix, x in enumerate(adjusted):
+                z = 1 - x
+                centres.append([x, y, z])
+                labels.append(1 if (ix + iy) % 2 == 0 else 0)
+
+        return np.array(centres), np.array(labels)
+
+    def generate_dataset(self, dataset_id: str, overlap: float = 0.0):
         """
         Create a synthetic dataset according to the provided template ID.
+
+        Some templates subdivide the unit cube into a number of ellipsoidal
+        clusters.  ``dataset_id=='2c'`` is a 4x4 checkerboard of 16 ellipsoids;
+        the ``overlap`` argument lets the caller compress the grid towards the
+        centre so that the spheres range from just-touching (``overlap=0``) to
+        completely overlapping ``(overlap=1``).
 
         Parameters
         ----------
         dataset_id : str
             Identifier of the template dataset (e.g., '1a', '2c', etc.).
+        overlap : float, optional
+            Amount of overlap between ellipsoids when the template defines a
+            grid.  Values are clamped to ``[0, 1]``; only ``'2c'`` currently
+            supports this argument and it is ignored for other identifiers.
+            ``0`` produces evenly-spaced (distant) clusters, ``1`` collapses
+            all centres to the midpoint.
 
         Returns
         -------
         pandas.DataFrame
             DataFrame with three feature columns and a target column ``'y'``.
         """
+        # make sure external callers haven't passed garbage
+        if not 0.0 <= overlap <= 1.0:
+            raise ValueError("overlap must be between 0 and 1")
+
         match dataset_id:
             case "0":
                 n1 = int(self.samples * self.imbalance_ratio)
@@ -197,66 +258,31 @@ class DataGenerator:
                 target = pd.DataFrame(y_1, columns=["y"])
                 return pd.concat([features, target], axis=1)
             case "2c":
+                # eight ellipsoids for each class; counts are balanced according
+                # to ``imbalance_ratio``.  this is the only template that
+                # currently makes use of the ``overlap`` argument.
                 n1 = int((self.samples * self.imbalance_ratio) / 8)
                 n2 = int((self.samples - n1 * 8) / 8)
 
-                X0 = self._ellipsoid([0.15, 0.15, 0.85], 0.15, 0.15, 0.15, n1)
-                X1 = self._ellipsoid([0.38, 0.15, 0.62], 0.15, 0.15, 0.15, n2)
-                X2 = self._ellipsoid([0.62, 0.15, 0.38], 0.15, 0.15, 0.15, n1)
-                X3 = self._ellipsoid([0.85, 0.15, 0.15], 0.15, 0.15, 0.15, n2)
-                X4 = self._ellipsoid([0.15, 0.38, 0.85], 0.15, 0.15, 0.15, n1)
-                X5 = self._ellipsoid([0.38, 0.38, 0.62], 0.15, 0.15, 0.15, n2)
-                X6 = self._ellipsoid([0.62, 0.38, 0.38], 0.15, 0.15, 0.15, n1)
-                X7 = self._ellipsoid([0.85, 0.38, 0.15], 0.15, 0.15, 0.15, n2)
-                X8 = self._ellipsoid([0.15, 0.62, 0.85], 0.15, 0.15, 0.15, n1)
-                X9 = self._ellipsoid([0.38, 0.62, 0.62], 0.15, 0.15, 0.15, n2)
-                X10 = self._ellipsoid([0.62, 0.62, 0.38], 0.15, 0.15, 0.15, n1)
-                X11 = self._ellipsoid([0.85, 0.62, 0.15], 0.15, 0.15, 0.15, n2)
-                X12 = self._ellipsoid([0.15, 0.85, 0.85], 0.15, 0.15, 0.15, n1)
-                X13 = self._ellipsoid([0.38, 0.85, 0.62], 0.15, 0.15, 0.15, n2)
-                X14 = self._ellipsoid([0.62, 0.85, 0.38], 0.15, 0.15, 0.15, n1)
-                X15 = self._ellipsoid([0.85, 0.85, 0.15], 0.15, 0.15, 0.15, n2)
+                # build a 4x4 checkerboard of centres; ``overlap`` slides them
+                # towards 0.5 so that 0==no overlap (evenly spaced) and 1==all
+                # coincide.
+                radius = 0.15
+                centres, labels = self._checkerboard_centres(
+                    grid_size=4, radius=radius, overlap=overlap
+                )
 
-                X_1 = np.concatenate(
-                    (
-                        X0,
-                        X1,
-                        X2,
-                        X3,
-                        X4,
-                        X5,
-                        X6,
-                        X7,
-                        X8,
-                        X9,
-                        X10,
-                        X11,
-                        X12,
-                        X13,
-                        X14,
-                        X15,
+                X_list = []
+                y_list = []
+                for lbl, centre in zip(labels, centres):
+                    count = n1 if lbl == 1 else n2
+                    X_list.append(
+                        self._ellipsoid(centre, radius, radius, radius, count)
                     )
-                )
-                y_1 = np.concatenate(
-                    (
-                        [1] * n1,
-                        [0] * n2,
-                        [1] * n1,
-                        [0] * n2,
-                        [0] * n1,
-                        [1] * n2,
-                        [0] * n1,
-                        [1] * n2,
-                        [1] * n1,
-                        [0] * n2,
-                        [1] * n1,
-                        [0] * n2,
-                        [0] * n1,
-                        [1] * n2,
-                        [0] * n1,
-                        [1] * n2,
-                    )
-                )
+                    y_list.append(np.full(count, lbl))
+
+                X_1 = np.concatenate(X_list)
+                y_1 = np.concatenate(y_list)
 
                 _, c = X_1.shape
                 features = pd.DataFrame(X_1, columns=[f"x{i}" for i in range(c)])
@@ -283,7 +309,7 @@ class DataGenerator:
                 X_1 = np.concatenate((X1, X2))
                 y_1 = np.concatenate(([1] * n1, [0] * n2))
 
-                r, c = X_1.shape
+                _, c = X_1.shape
                 features = pd.DataFrame(X_1, columns=[f"x{i}" for i in range(c)])
                 target = pd.DataFrame(y_1, columns=["y"])
                 return pd.concat([features, target], axis=1)

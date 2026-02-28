@@ -586,7 +586,7 @@ def evaluation_function(
     return (fit_score,)
 
 
-def get_matrices(X_train, X_test, y_train, fm: str = "Z"):
+def get_matrices(X_train, X_test, y_train, fm: str = "Z", backend: str = "qiskit"):
     """
     Build kernel matrices for QSVC evaluation using the selected feature map.
 
@@ -601,6 +601,12 @@ def get_matrices(X_train, X_test, y_train, fm: str = "Z"):
     fm : str, optional
         Feature-map identifier string (e.g., ``'Z'``, ``'ZZ-linear'``, or a
         Pauli string), by default ``'Z'``.
+    backend : {'qiskit', 'pennylane'}, optional
+        Backend used to evaluate the kernel matrices. ``'qiskit'`` leverages
+        :mod:`qiskit` primitives and the ``StatevectorSampler`` while
+        ``'pennylane'`` uses PennyLane with the Qulacs simulator. The latter
+        is often significantly faster for the small circuit sizes used in the
+        benchmarks.
 
     Returns
     -------
@@ -610,42 +616,87 @@ def get_matrices(X_train, X_test, y_train, fm: str = "Z"):
         score on the training set.
     """  # Num features
     num_dim = X_train.shape[1]
-    kernel = None
 
+    if backend == "qiskit":
+        kernel = None
+
+        if fm == "Z":
+            kernel = qiskit_pauli_kernel(dims=num_dim, paulis=None)
+        elif fm.startswith("ZZ"):
+            from qiskit.circuit.library import ZZFeatureMap
+
+            _, entanglement = fm.split("-")
+
+            sampler = Sampler()
+            fidelity = ComputeUncompute(sampler=sampler)
+
+            # Instantiate quantum kernel
+            feature_map = ZZFeatureMap(num_dim, reps=1, entanglement=entanglement)
+            kernel = FidelityQuantumKernel(fidelity=fidelity, feature_map=feature_map)
+        else:
+            from qiskit.circuit.library import PauliFeatureMap
+
+            sampler = Sampler()
+            fidelity = ComputeUncompute(sampler=sampler)
+
+            if "-" in fm:
+                pauli, entanglement = fm.split("-")
+                feature_map = PauliFeatureMap(
+                    num_dim, reps=1, paulis=[pauli], entanglement=entanglement
+                )
+            else:
+                feature_map = PauliFeatureMap(num_dim, reps=1, paulis=[fm])
+            kernel = FidelityQuantumKernel(fidelity=fidelity, feature_map=feature_map)
+
+        cka = qiskit_centered_target_alignment(kernel, X_train, y_train)
+
+        matrix_train = kernel.evaluate(x_vec=X_train)
+        matrix_test = kernel.evaluate(x_vec=X_test, y_vec=X_train)
+
+        return matrix_train, matrix_test, cka
+
+    # pennylane branch
+    # build equivalent pauli kernel for the requested feature map
+    # build a Pennylane kernel function and wrap it into a QNode device
     if fm == "Z":
-        kernel = qiskit_pauli_kernel(dims=num_dim, paulis=None)
+        base_kernel = pennylane_pauli_kernel(paulis=["Z"])
     elif fm.startswith("ZZ"):
-        from qiskit.circuit.library import ZZFeatureMap
-
+        # qiskit uses a dedicated ZZFeatureMap that allows different
+        # entanglement patterns; emulate with a single "ZZ" pauli word and
+        # adjust entanglement mode. Perfect feature equality is not
+        # guaranteed but the benchmark exercise typically does not rely on
+        # the full-graph behaviour.
         _, entanglement = fm.split("-")
-
-        sampler = Sampler()
-        fidelity = ComputeUncompute(sampler=sampler)
-
-        # Instantiate quantum kernel
-        feature_map = ZZFeatureMap(num_dim, reps=1, entanglement=entanglement)
-        kernel = FidelityQuantumKernel(fidelity=fidelity, feature_map=feature_map)
+        ent = "linear" if entanglement == "linear" else "pauli"
+        base_kernel = pennylane_pauli_kernel(paulis=["ZZ"], entanglement=ent)
     else:
-        from qiskit.circuit.library import PauliFeatureMap
-
-        sampler = Sampler()
-        fidelity = ComputeUncompute(sampler=sampler)
-
         if "-" in fm:
             pauli, entanglement = fm.split("-")
-            feature_map = PauliFeatureMap(
-                num_dim, reps=1, paulis=[pauli], entanglement=entanglement
+            base_kernel = pennylane_pauli_kernel(
+                paulis=[pauli], entanglement=entanglement
             )
         else:
-            feature_map = PauliFeatureMap(num_dim, reps=1, paulis=[fm])
-        kernel = FidelityQuantumKernel(fidelity=fidelity, feature_map=feature_map)
+            base_kernel = pennylane_pauli_kernel(paulis=[fm])
 
-    cka = qiskit_centered_target_alignment(kernel, X_train, y_train)
+    # device and QNode wrapper for evaluation
+    device = qml.device("qulacs.simulator", wires=num_dim)
+    kernel = qml.QNode(base_kernel, device)
 
-    matrix_train = kernel.evaluate(x_vec=X_train)
-    matrix_test = kernel.evaluate(x_vec=X_test, y_vec=X_train)
+    def pennylane_matrix_compute(A, B):
+        # Ensure A is 2D for consistent kernel matrix computation
+        if len(A.shape) == 1:
+            A = A.reshape(1, -1)
+        # compute |0> probability directly from the QNode output
+        return np.array([[kernel(a, b)[0] for b in B] for a in A])
 
-    return matrix_train, matrix_test, cka
+    # kernel for sample-wise evaluation used by CKA
+    def single_sample_kernel(x1, x2):
+        return kernel(x1, x2)[0]
+
+    cka = pennylane_centered_kernel_alignment(X_train, y_train, single_sample_kernel)
+    m_train = pennylane_matrix_compute(X_train, X_train)
+    m_test = pennylane_matrix_compute(X_test, X_train)
+    return m_train, m_test, cka
 
 
 def get_scores_ind(
@@ -705,15 +756,19 @@ def get_scores_ind(
             numpy.ndarray
                 Precomputed kernel matrix with |0> probabilities.
             """
-            if len(A.shape) == 2:
-                # Single vector
-                return np.array([[kernel(a, b)[0] for b in B] for a in A])
-            else:
-                # Matrix
-                return kernel(A, B)[0]
+            # Ensure A is 2D for consistent kernel matrix computation
+            if len(A.shape) == 1:
+                A = A.reshape(1, -1)
+
+            # Always return a 2D kernel matrix compatible with SVC precomputed kernels
+            return np.array([[kernel(a, b)[0] for b in B] for a in A])
+
+        # Pass a kernel function that takes individual samples for CKA computation
+        def single_sample_kernel(x1, x2):
+            return np.array(kernel(x1, x2))[0]
 
         cka = pennylane_centered_kernel_alignment(
-            X_train, y_train, pennylane_matrix_compute
+            X_train, y_train, single_sample_kernel
         )
 
         m_train = pennylane_matrix_compute(X_train, X_train)

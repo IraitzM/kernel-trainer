@@ -228,6 +228,7 @@ def train(**kwargs):
 @p.samples
 @p.imratio
 @p.seed
+@p.overlap
 def generate(**kwargs):
     """
     Generate and save a synthetic dataset based on pre-defined templates.
@@ -253,7 +254,7 @@ def generate(**kwargs):
         samples=samples, imbalance_ratio=imbalance_ratio, seed=seed
     )
 
-    data = generator.generate_dataset(dataset_id)
+    data = generator.generate_dataset(dataset_id, overlap=kwargs.get("overlap", 0.0))
 
     # Generate samples
     if "out_path" in kwargs:
@@ -420,6 +421,7 @@ def stats(**kwargs):
 @p.seed
 @p.file_path
 @p.out_path
+@p.backend
 def benchmark(**kwargs):
     """
     Run benchmark procedures on a dataset and export results to CSV.
@@ -568,10 +570,15 @@ def benchmark(**kwargs):
 
         table.add_row(svc_type, str(roc_auc), str(f1score), "--")
 
-    # Quantum
+    # backend for quantum kernels (either qiskit or pennylane)
+    backend = kwargs.get("backend", "pennylane")
+
+    # Quantum (quantum-support-vector classifiers with different feature maps)
     for qsvc in ["Z", "ZZ-full", "ZY", "ZZ-linear", "ZY-linear", "XY"]:
-        logger.debug(f"Running {qsvc} QSVM training")
-        m_train, m_test, cka = get_matrices(X_train, X_test, y_train, qsvc)
+        logger.debug(f"Running {qsvc} QSVM training on backend {backend}")
+        m_train, m_test, cka = get_matrices(
+            X_train, X_test, y_train, qsvc, backend=backend
+        )
 
         model = SVC(kernel="precomputed", probability=True, random_state=seed)
         model.fit(m_train, y_train)
@@ -587,11 +594,17 @@ def benchmark(**kwargs):
     # roc_auc, f1score, cka = get_scores_ind(X_train, X_test, y_train, y_test, individual)
     # table.add_row("best (qiskit)", str(roc_auc), str(f1score), str(cka))
 
-    # Pennylane
+    # best individual using the selected backend
     roc_auc, f1score, cka = get_scores_ind(
-        X_train, X_test, y_train, y_test, individual, backend="pennylane", seed=seed
+        X_train,
+        X_test,
+        y_train,
+        y_test,
+        individual,
+        backend=backend,
+        seed=seed,
     )
-    table.add_row("best (pennylane)", str(roc_auc), str(f1score), str(cka))
+    table.add_row(f"best ({backend})", str(roc_auc), str(f1score), str(cka))
     if cka < max_cka:
         logger.warning(
             f"CKA in this execution is lower than the original max CKA: {cka} < {max_cka}"
