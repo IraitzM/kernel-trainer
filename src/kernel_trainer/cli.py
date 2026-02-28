@@ -55,6 +55,8 @@ def cli(ctx, **kwargs):
 @p.algo
 @p.backend
 @p.seed
+@p.checkpoint
+@p.checkpoint_frequency
 def train(**kwargs):
     """
     CLI command to search for optimal feature maps.
@@ -166,6 +168,10 @@ def train(**kwargs):
             f"Chain size {chain_size} must be a multiple of dataset width {X_train.shape[1]}"
         )
 
+    # Checkpointing
+    checkpoint_path = kwargs.get("checkpoint")
+    checkpoint_frequency = kwargs.get("checkpoint_frequency")
+
     # Select algo
     if algo == "brute-force":
         logger.info(f"Going for the brute force approach for {4**chain_size} items")
@@ -191,6 +197,8 @@ def train(**kwargs):
             "processes": kwargs.get("processes"),
             "backend": kwargs.get("backend", "qiskit"),
             "metric": kwargs.get("metric", "CKA"),
+            "checkpoint_path": checkpoint_path,
+            "checkpoint_frequency": checkpoint_frequency,
         }
 
         pop_final, log = kernel_generator(**config)
@@ -209,6 +217,10 @@ def train(**kwargs):
         with open(f"{outpath}_{mode}_{num_dimensions}_{timestamp}.pkl", "wb") as file:
             pickle.dump(results, file)
 
+    # Erase checkpoint
+    if checkpoint_path and checkpoint_path.exists():
+        logger.info(f"Removing checkpoint {checkpoint_path}")
+        os.remove(checkpoint_path)
 
 @cli.command("generate")
 @p.out_path_man

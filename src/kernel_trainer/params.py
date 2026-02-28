@@ -256,3 +256,19 @@ cache = click.option(
     help="To enable cache",
     default=False,
 )
+
+checkpoint = click.option(
+    "--checkpoint",
+    envvar=None,
+    help="Checkpoint file to resume from",
+    type=click.Path(resolve_path=True, path_type=Path),
+    default=None,
+)
+
+checkpoint_frequency = click.option(
+    "--checkpoint-frequency",
+    envvar=None,
+    help="How often to save checkpoints (in generations)",
+    type=click.INT,
+    default=1,
+)

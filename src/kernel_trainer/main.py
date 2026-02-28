@@ -2,10 +2,11 @@ import time
 import random
 import numpy as np
 from tqdm import tqdm
-
+import pickle
 from itertools import product
 from deap import base, creator, tools, algorithms
 from multiprocessing import Pool
+from pathlib import Path
 
 from kernel_trainer.kernels import evaluation_function
 from kernel_trainer.config import logger
@@ -122,6 +123,8 @@ def kernel_generator(
     processes: int = 1,
     penalize_complexity: bool = False,
     tournament_size: int = 10,
+    checkpoint_path: Path = None,
+    checkpoint_frequency: int = 1,
 ):
     """
     Evolutionary search to find promising feature-map individuals.
@@ -179,8 +182,6 @@ def kernel_generator(
         metric=metric,
         penalize_complexity=penalize_complexity,
     )
-    # Population
-    population = toolbox.population(n=num_pop)
 
     # Set stats and logs
     stats = tools.Statistics(lambda ind: ind.fitness.values)
@@ -189,21 +190,37 @@ def kernel_generator(
     stats.register("min", np.min)
     stats.register("max", np.max)
 
-    logbook = tools.Logbook()
-    logbook.header = ["gen", "nevals", "ts"] + (stats.fields if stats else [])
+    # Check for checkpoint
+    start_gen = 0
+    if checkpoint_path and checkpoint_path.exists():
+        logger.info(f"Loading checkpoint from {checkpoint_path}")
+        with open(checkpoint_path, "rb") as f:
+            cp = pickle.load(f)
+        population = cp["population"]
+        start_gen = cp["generation"] + 1
+        logbook = cp["logbook"]
+        random.setstate(cp["rndstate"])
+    else:
+        # Population
+        population = toolbox.population(n=num_pop)
 
-    # Evaluate the individuals with an invalid fitness
-    valid_ind = [ind for ind in population if not ind.fitness.valid]
-    fitnesses = toolbox.map(toolbox.evaluate, valid_ind)
-    for ind, fit in zip(valid_ind, fitnesses):
-        ind.fitness.values = fit
+        # Set stats and logs
+        logbook = tools.Logbook()
+        logbook.header = ["gen", "nevals", "ts"] + (stats.fields if stats else [])
 
-    record = stats.compile(population) if stats else {}
-    logbook.record(gen=0, nevals=len(valid_ind), ts=0, **record)
-    logger.info(logbook.stream)
+    if start_gen == 0:
+        # Evaluate the individuals with an invalid fitness
+        valid_ind = [ind for ind in population if not ind.fitness.valid]
+        fitnesses = toolbox.map(toolbox.evaluate, valid_ind)
+        for ind, fit in zip(valid_ind, fitnesses):
+            ind.fitness.values = fit
+
+        record = stats.compile(population) if stats else {}
+        logbook.record(gen=0, nevals=len(valid_ind), ts=0, **record)
+        logger.info(logbook.stream)
 
     # Begin the generational process
-    for gen in tqdm(range(1, ngen + 1)):
+    for gen in tqdm(range(start_gen, ngen + 1)):
         start_time = time.time()
 
         # Select the next generation individuals
@@ -226,6 +243,17 @@ def kernel_generator(
         timediff = time.time() - start_time
         logbook.record(gen=gen, nevals=len(valid_ind), ts=timediff, **record)
         logger.info(logbook.stream)
+
+        # Save checkpoint
+        if checkpoint_path and (gen % checkpoint_frequency == 0 or gen == ngen):
+            cp = dict(
+                population=population,
+                generation=gen,
+                logbook=logbook,
+                rndstate=random.getstate(),
+            )
+            with open(checkpoint_path, "wb") as f:
+                pickle.dump(cp, f)
 
         # Early stop
         last_iterations = [elem["max"] for elem in logbook[-10:]]
