@@ -2,14 +2,14 @@ cff-version: 1.2.0
 message: "If you use this software, please cite the published scientific work described below."
 title: "kernel-trainer"
 authors:
-  - family-names: "M."
+  - family-names: "Montalban"
     given-names: "Iraitz"
 version: "0.1.8"
 license: MIT
 repository-code: "https://github.com/IraitzM/kernel-trainer"
 preferred-citation:
   type: article
-  title: "[Please update with the exact article title from the published paper]"
+  title: "A framework to study the relationship between classical data and quantum characteristics in quantum machine learning"
   journal: "The Journal of Supercomputing"
   year: 2026
   doi: "10.1007/s11227-026-08396-7"
