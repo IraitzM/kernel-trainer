@@ -1,5 +1,10 @@
 """
-Lists predefined kernel structures
+Predefined quantum kernel structures.
+
+Original implementation and explanatory comments in this module are covered
+by the repository's MIT license. Qiskit and PennyLane are third-party projects;
+their code and licenses remain theirs, and this notice does not claim ownership
+of upstream code.
 """
 
 import time
