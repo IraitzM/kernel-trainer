@@ -217,8 +217,8 @@ def train(**kwargs):
         with open(f"{outpath}_{mode}_{num_dimensions}_{timestamp}.pkl", "wb") as file:
             pickle.dump(results, file)
 
-    # Erase checkpoint
-    if checkpoint_path and checkpoint_path.exists():
+    # Erase checkpoint after a successful evolutionary run
+    if algo != "brute-force" and checkpoint_path and checkpoint_path.exists():
         logger.info(f"Removing checkpoint {checkpoint_path}")
         os.remove(checkpoint_path)
 
