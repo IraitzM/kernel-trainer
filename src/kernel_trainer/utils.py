@@ -1,11 +1,13 @@
 """
 Utilities
 """
+
 import os
 import pandas as pd
 import plotly.express as px
 
 from kernel_trainer.config import logger
+
 
 def visualize_3d(data):
     """
@@ -30,13 +32,14 @@ def visualize_3d(data):
 
     return fig
 
-def collect_results(path: str, metric:str, summarize:bool = True) -> pd.DataFrame:
+
+def collect_results(path: str, metric: str, summarize: bool = True) -> pd.DataFrame:
     """
     Collect and aggregate results from multiple CSV files organized by dataset categories.
-    
+
     This function reads CSV files from a specified directory, extracts metric values for
     different kernel methods across dataset categories, and returns a consolidated DataFrame.
-    
+
     Parameters
     ----------
     path : str
@@ -48,7 +51,7 @@ def collect_results(path: str, metric:str, summarize:bool = True) -> pd.DataFram
     summarize : bool, optional
         If True, only process files containing "compact" in their filename.
         If False, process all matching files. Default is True.
-    
+
     Returns
     -------
     pd.DataFrame
@@ -61,9 +64,9 @@ def collect_results(path: str, metric:str, summarize:bool = True) -> pd.DataFram
         - 'zy': Metric value for ZY kernel method
         - 'zz-full': Metric value for ZZ-full kernel method
         - 'best': Metric value for best PennyLane method
-        
+
         Missing or invalid values ('--' or NaN) are converted to None.
-    
+
     Notes
     -----
     - Files not found in the specified path trigger a warning but do not halt execution.
@@ -71,17 +74,17 @@ def collect_results(path: str, metric:str, summarize:bool = True) -> pd.DataFram
     - The function processes files from nine dataset categories: 1a-1c, 2a-2c, 3a-3c.
     - Seven kernel methods are extracted from each file: linear, poly, rbf, Z, ZY, ZZ-full,
         and best (pennylane).
-    
+
     Raises
     ------
     FileNotFoundError
         If the specified path directory does not exist.
     """
     # Define the categories
-    categories = ['1a', '1b', '1c', '2a', '2b', '2c', '3a', '3b', '3c']
+    categories = ["1a", "1b", "1c", "2a", "2b", "2c", "3a", "3b", "3c"]
 
     # Define the methods we want to extract
-    methods = ['linear', 'poly', 'rbf', 'Z', 'ZY','ZZ-full', 'best (pennylane)']
+    methods = ["linear", "poly", "rbf", "Z", "ZY", "ZZ-full", "best (pennylane)"]
 
     # Initialize a list to store rows
     data_rows = []
@@ -102,17 +105,17 @@ def collect_results(path: str, metric:str, summarize:bool = True) -> pd.DataFram
             df = pd.read_csv(f"{path}/{filename}")
 
             # Create a row for this category
-            row = {'Dataset': category}
+            row = {"Dataset": category}
 
             # Extract values for each method
             for method in methods:
                 # Find the row for this method
-                method_row = df[df['Method'] == method]
+                method_row = df[df["Method"] == method]
 
                 if not method_row.empty:
                     value = method_row[metric].values[0]
                     # Handle '--' values
-                    if value == '--' or pd.isna(value):
+                    if value == "--" or pd.isna(value):
                         row[method] = None
                     else:
                         row[method] = float(value)
@@ -126,20 +129,22 @@ def collect_results(path: str, metric:str, summarize:bool = True) -> pd.DataFram
 
     # Rename columns to match your desired output
     column_mapping = {
-        'Dataset': 'Dataset',
-        'linear': 'linear',
-        'poly': 'poly',
-        'rbf': 'rbf',
-        'Z': 'z',
-        'ZY': 'zy',
-        'ZZ-full': 'zz-full',
-        'best (pennylane)': 'best'
+        "Dataset": "Dataset",
+        "linear": "linear",
+        "poly": "poly",
+        "rbf": "rbf",
+        "Z": "z",
+        "ZY": "zy",
+        "ZZ-full": "zz-full",
+        "best (pennylane)": "best",
     }
     result_df = result_df.rename(columns=column_mapping)
 
     # Reorder columns
     if result_df.empty:
-        return pd.DataFrame(columns=['Dataset', 'linear', 'poly', 'rbf', 'z', 'zy', 'zz-full', 'best'])
+        return pd.DataFrame(
+            columns=["Dataset", "linear", "poly", "rbf", "z", "zy", "zz-full", "best"]
+        )
 
     # else
-    return result_df[['Dataset', 'linear', 'poly', 'rbf', 'z', 'zy', 'zz-full', 'best']]
+    return result_df[["Dataset", "linear", "poly", "rbf", "z", "zy", "zz-full", "best"]]

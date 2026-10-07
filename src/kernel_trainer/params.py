@@ -62,8 +62,23 @@ dataset = click.option(
     type=Union(
         [
             click.Path(resolve_path=True, exists=True, path_type=Path),
-            click.Choice(["iris", "breast-cancer", "wine", "monk",
-                          "1a", "1b", "1c","2a", "2b", "2c","3a", "3b", "3c",]),
+            click.Choice(
+                [
+                    "iris",
+                    "breast-cancer",
+                    "wine",
+                    "monk",
+                    "1a",
+                    "1b",
+                    "1c",
+                    "2a",
+                    "2b",
+                    "2c",
+                    "3a",
+                    "3b",
+                    "3c",
+                ]
+            ),
         ]
     ),
     default=None,
@@ -192,6 +207,14 @@ id = click.option(
     "--id", envvar=None, help="Dataset ID", default=None, type=click.STRING
 )
 
+overlap = click.option(
+    "--overlap",
+    envvar=None,
+    help="Amount of overlap between synthetic ellipsoids (0=none, 1=full)",
+    default=0.0,
+    type=click.FloatRange(0.0, 1.0),
+)
+
 
 metric = click.option(
     "--metric",
@@ -232,4 +255,20 @@ cache = click.option(
     is_flag=True,
     help="To enable cache",
     default=False,
+)
+
+checkpoint = click.option(
+    "--checkpoint",
+    envvar=None,
+    help="Checkpoint file to resume from",
+    type=click.Path(resolve_path=True, path_type=Path),
+    default=None,
+)
+
+checkpoint_frequency = click.option(
+    "--checkpoint-frequency",
+    envvar=None,
+    help="How often to save checkpoints (in generations)",
+    type=click.IntRange(min=1),
+    default=1,
 )

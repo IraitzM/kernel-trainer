@@ -16,13 +16,15 @@ You can also use the `CITATION.cff` file in the repository root for citation met
 
 This library also allows for CLI access by specifying the corresponding parameters.
 
-For data generation:
+For data generation (some templates take an ``--overlap`` flag to
+control how tightly packed the ellipsoidal clusters are):
 ```py
 ktrainer generate 
     --file-path file.csv
     --dataset-id 1a
     --samples 300
     --imbalance-ratio 0.1
+    --overlap 0.0    # 0.0 = distant, 1.0 = fully overlapping (only relevant for 2c)
 ```
 
 Once the file is created, search of the best kernel can be triggered as follows:
@@ -57,14 +59,18 @@ It shows a table with the statistics for expressivity, entanglement capacity and
 
 ![Stats summary table](assets/stats.png)
 
-The benchmark subcommand, takes an individual dataset id from its original dataset file and compares the obtained best individual against classical and pre-fixed quantum kernels.
+The benchmark subcommand takes an individual dataset id from its original dataset file and compares the obtained best individual against classical and pre‑fixed quantum kernels. By default the quantum kernels are evaluated with the PennyLane/Qulacs backend; pass ``--backend qiskit`` to use Qiskit's statevector sampler instead.
+
 ```py
-ktrainer benchmark 
-    --dataset file.csv
-    --dims 3
-    --mode raw
+ktrainer benchmark \
+    --dataset file.csv \
+    --file-path results-folder \
+    --dims 3 \
+    --mode raw \
+    --backend pennylane
 ```
-A stats summary table will appear at the end for a particular dataset and best found individual labeled as `best`.
+
+A stats summary table will appear at the end for a particular dataset and best found individual labeled as ``best (qiskit)`` or ``best (pennylane)`` depending on the chosen backend.
 
 ![Benchmark CLI summary table](assets/benchmarkcli.png)
 
