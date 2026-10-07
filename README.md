@@ -4,6 +4,14 @@ A clean version of the module used to find the most performant quantum kernel co
 
 Examples can be found under _notebooks_ folder.
 
+## Citation
+
+If you use this project in your work, please cite the published scientific article:
+
+> Montalban, I. et al. (2026). *A framework to study the relationship between classical data and quantum characteristics in quantum machine learning*. The Journal of Supercomputing. https://doi.org/10.1007/s11227-026-08396-7
+
+You can also use the `CITATION.cff` file in the repository root for citation metadata.
+
 ## CLI usage
 
 This library also allows for CLI access by specifying the corresponding parameters.
