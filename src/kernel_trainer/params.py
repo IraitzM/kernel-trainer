@@ -269,6 +269,6 @@ checkpoint_frequency = click.option(
     "--checkpoint-frequency",
     envvar=None,
     help="How often to save checkpoints (in generations)",
-    type=click.INT,
+    type=click.IntRange(min=1),
     default=1,
 )
