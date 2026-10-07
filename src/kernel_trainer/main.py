@@ -220,7 +220,7 @@ def kernel_generator(
         logger.info(logbook.stream)
 
     # Begin the generational process
-    for gen in tqdm(range(start_gen, ngen + 1)):
+    for gen in tqdm(range(max(1, start_gen), ngen + 1)):
         start_time = time.time()
 
         # Select the next generation individuals
