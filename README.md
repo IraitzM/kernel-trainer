@@ -51,7 +51,7 @@ It shows a table with the statistics for expressivity, entanglement capacity and
 
 ![Stats summary table](assets/stats.png)
 
-The benchmark subcommand takes an individual dataset id from its original dataset file and compares the obtained best individual against classical and pre‑fixed quantum kernels.  By default the quantum kernels are evaluated with Qiskit which uses a statevector sampler and can become the slowest part of the procedure; you can switch to the PennyLane/Qulacs backend for much faster matrix construction by passing ``--backend pennylane``.
+The benchmark subcommand takes an individual dataset id from its original dataset file and compares the obtained best individual against classical and pre‑fixed quantum kernels. By default the quantum kernels are evaluated with the PennyLane/Qulacs backend; pass ``--backend qiskit`` to use Qiskit's statevector sampler instead.
 
 ```py
 ktrainer benchmark \
