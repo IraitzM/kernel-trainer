@@ -659,7 +659,7 @@ def get_matrices(X_train, X_test, y_train, fm: str = "Z", backend: str = "qiskit
     # build equivalent pauli kernel for the requested feature map
     # build a Pennylane kernel function and wrap it into a QNode device
     if fm == "Z":
-        base_kernel = pennylane_pauli_kernel(paulis=["Z"])
+        base_kernel = pennylane_pauli_kernel()
     elif fm.startswith("ZZ"):
         # qiskit uses a dedicated ZZFeatureMap that allows different
         # entanglement patterns; emulate with a single "ZZ" pauli word and
